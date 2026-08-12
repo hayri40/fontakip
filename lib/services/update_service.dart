@@ -105,4 +105,30 @@ class UpdateService {
 
     return 0;
   }
+
+  Future<int?> getApkFileSize(String apkUrl) async {
+    if (apkUrl.isEmpty) {
+      return null;
+    }
+
+    try {
+      final response = await http
+          .head(Uri.parse(apkUrl))
+          .timeout(const Duration(seconds: 5));
+
+      if (response.statusCode == 200) {
+        final contentLength = response.contentLength;
+        if (contentLength != null && contentLength > 0) {
+          return contentLength;
+        }
+      }
+      return null;
+    } on Exception {
+      return null;
+    }
+  }
+
+  bool isApkUrlValid(String? apkUrl) {
+    return apkUrl != null && apkUrl.isNotEmpty;
+  }
 }

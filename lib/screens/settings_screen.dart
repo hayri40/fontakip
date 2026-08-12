@@ -262,6 +262,78 @@ class _SettingsScreenState extends State<SettingsScreen> {
     );
   }
 
+  String _formatDownloadProgress() {
+    if (_downloadTotal == 0) {
+      return 'İndiriliyor...';
+    }
+    final percent = ((_downloadProgress / _downloadTotal) * 100)
+        .toStringAsFixed(0);
+    final downloadedSize = _updateDownloadService.formatFileSize(
+      _downloadProgress,
+    );
+    final totalSize = _updateDownloadService.formatFileSize(_downloadTotal);
+    return 'İndiriliyor... $percent% ($downloadedSize / $totalSize)';
+  }
+
+  Future<void> _showDownloadConfirmation() async {
+    if (_latestVersion == null ||
+        !_updateService.isApkUrlValid(_latestVersion!.apkUrl)) {
+      return;
+    }
+
+    final fileSize = await _updateService.getApkFileSize(
+      _latestVersion!.apkUrl!,
+    );
+    final fileSizeText = fileSize != null
+        ? _updateDownloadService.formatFileSize(fileSize)
+        : 'Bilinmiyor';
+
+    if (!mounted) {
+      return;
+    }
+
+    final result = await showDialog<bool>(
+      context: context,
+      builder: (BuildContext context) {
+        return AlertDialog(
+          title: const Text('Güncellemeyi İndir'),
+          content: SingleChildScrollView(
+            child: ListBody(
+              children: [
+                Text('Sürüm: v${_latestVersion!.version}'),
+                const SizedBox(height: 8),
+                Text('Yayın Tarihi: ${_latestVersion!.formattedReleaseDate}'),
+                const SizedBox(height: 8),
+                Text('Dosya Boyutu: $fileSizeText'),
+                const SizedBox(height: 16),
+                const Text(
+                  'Devam etmek istiyor musunuz?',
+                  style: TextStyle(fontWeight: FontWeight.w500),
+                ),
+              ],
+            ),
+          ),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.pop(context, false),
+              child: const Text('İptal'),
+            ),
+            FilledButton(
+              onPressed: () => Navigator.pop(context, true),
+              child: const Text('İndir'),
+            ),
+          ],
+        );
+      },
+    );
+
+    if (result != true) {
+      return;
+    }
+
+    await _handleDownloadApk();
+  }
+
   Future<void> _handleDownloadApk() async {
     if (_downloadingUpdate ||
         _latestVersion?.apkUrl == null ||
@@ -329,15 +401,6 @@ class _SettingsScreenState extends State<SettingsScreen> {
         _downloadingUpdate = false;
       });
     }
-  }
-
-  String _formatDownloadProgress() {
-    if (_downloadTotal == 0) {
-      return 'İndiriliyor...';
-    }
-    final percent = ((_downloadProgress / _downloadTotal) * 100)
-        .toStringAsFixed(0);
-    return 'İndiriliyor...\n%$percent';
   }
 
   Future<void> _exportBackup() async {
@@ -631,11 +694,30 @@ class _SettingsScreenState extends State<SettingsScreen> {
                                 ],
                               ),
                             )
+                          else if (!_updateService.isApkUrlValid(
+                            _latestVersion!.apkUrl,
+                          ))
+                            Container(
+                              width: double.infinity,
+                              padding: const EdgeInsets.all(12),
+                              decoration: BoxDecoration(
+                                color: Colors.orange.shade100,
+                                borderRadius: BorderRadius.circular(8),
+                              ),
+                              child: const Text(
+                                'Güncelleme paketi henüz yayınlanmamış',
+                                textAlign: TextAlign.center,
+                                style: TextStyle(
+                                  color: Colors.orange,
+                                  fontWeight: FontWeight.w500,
+                                ),
+                              ),
+                            )
                           else
                             SizedBox(
                               width: double.infinity,
                               child: FilledButton.icon(
-                                onPressed: _handleDownloadApk,
+                                onPressed: _showDownloadConfirmation,
                                 icon: const Icon(Icons.download),
                                 label: const Text('APK İndir'),
                               ),
@@ -646,6 +728,32 @@ class _SettingsScreenState extends State<SettingsScreen> {
                         Text('Son Kontrol:\n${_formatLastCheck()}'),
                       ],
                     ],
+                  ],
+                  if (_updateCheckAttempted && !_updateCheckFailed) ...[
+                    const SizedBox(height: 16),
+                    const Divider(),
+                    const SizedBox(height: 12),
+                    const Text(
+                      'Debug Bilgileri',
+                      style: TextStyle(
+                        fontSize: 12,
+                        fontWeight: FontWeight.w600,
+                        color: Colors.grey,
+                      ),
+                    ),
+                    const SizedBox(height: 4),
+                    Text(
+                      'URL: ${_updateService.versionUrl}',
+                      style: const TextStyle(fontSize: 10, color: Colors.grey),
+                    ),
+                    if (_latestVersion != null)
+                      Text(
+                        'Algılanan Sürüm: v${_latestVersion!.version}',
+                        style: const TextStyle(
+                          fontSize: 10,
+                          color: Colors.grey,
+                        ),
+                      ),
                   ],
                 ],
               ),

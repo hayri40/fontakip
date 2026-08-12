@@ -7,6 +7,18 @@ import 'package:url_launcher/url_launcher.dart';
 class UpdateDownloadService {
   static const String _apkFileName = 'fontakip_update.apk';
 
+  String formatFileSize(int bytes) {
+    if (bytes < 1024) {
+      return '$bytes B';
+    } else if (bytes < 1024 * 1024) {
+      return '${(bytes / 1024).toStringAsFixed(1)} KB';
+    } else if (bytes < 1024 * 1024 * 1024) {
+      return '${(bytes / (1024 * 1024)).toStringAsFixed(1)} MB';
+    } else {
+      return '${(bytes / (1024 * 1024 * 1024)).toStringAsFixed(1)} GB';
+    }
+  }
+
   Future<String?> downloadApk(
     String apkUrl,
     Function(int current, int total)? onProgress,

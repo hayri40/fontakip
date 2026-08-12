@@ -6,7 +6,7 @@ import '../models/version_info.dart';
 
 class UpdateService {
   static const String defaultVersionUrl =
-      'https://raw.githubusercontent.com/hayri40/fontakip/main/version.json';
+      'https://raw.githubusercontent.com/hayri40/fontakip/master/version.json';
 
   final String versionUrl;
 

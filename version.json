@@ -1,0 +1,11 @@
+{
+  "version": "1.0.1",
+  "releaseDate": "2026-08-12",
+  "notes": [
+    "APK İndir özelliği eklendi",
+    "Güncellemeleri manuel kontrol edebilirsiniz",
+    "Bulut yedekleme altyapısı hazırlandı",
+    "Google ile giriş yapılabilir"
+  ],
+  "apkUrl": "https://github.com/hayri40/fontakip/releases/download/v1.0.1/app-release.apk"
+}

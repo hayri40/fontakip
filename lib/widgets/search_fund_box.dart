@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 class SearchFundBox extends StatefulWidget {
   final TextEditingController controller;
   final VoidCallback onSearch;
+  final VoidCallback onProcess;
   final VoidCallback onAddFavorite;
   final bool isFavorite;
 
@@ -10,6 +11,7 @@ class SearchFundBox extends StatefulWidget {
     super.key,
     required this.controller,
     required this.onSearch,
+    required this.onProcess,
     required this.onAddFavorite,
     required this.isFavorite,
   });
@@ -49,6 +51,17 @@ class _SearchFundBoxState extends State<SearchFundBox> {
                   onPressed: widget.onSearch,
                   icon: const Icon(Icons.search),
                   label: const Text('Get Fund'),
+                  style: ElevatedButton.styleFrom(
+                    padding: const EdgeInsets.symmetric(vertical: 12),
+                  ),
+                ),
+              ),
+              const SizedBox(width: 12),
+              Expanded(
+                child: ElevatedButton.icon(
+                  onPressed: widget.onProcess,
+                  icon: const Icon(Icons.receipt_long),
+                  label: const Text('İşlem Yap'),
                   style: ElevatedButton.styleFrom(
                     padding: const EdgeInsets.symmetric(vertical: 12),
                   ),

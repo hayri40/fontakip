@@ -1,4 +1,6 @@
 import 'package:flutter/material.dart';
+
+import '../core/formatters/app_formatters.dart';
 import '../models/fund.dart';
 import 'current_price_card.dart';
 import 'fund_header_card.dart';
@@ -43,7 +45,7 @@ class FundDetailCard extends StatelessWidget {
           child: ListTile(
             title: const Text("Sharpe Ratio"),
             trailing: Text(
-              fund.sharpe90.toStringAsFixed(2),
+              AppFormatters.decimalValue(fund.sharpe90),
               style: const TextStyle(
                 fontWeight: FontWeight.bold,
               ),

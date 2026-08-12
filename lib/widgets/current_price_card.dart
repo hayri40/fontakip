@@ -1,5 +1,7 @@
 import 'package:flutter/material.dart';
 
+import '../core/formatters/app_formatters.dart';
+
 class CurrentPriceCard extends StatelessWidget {
   final double price;
 
@@ -29,7 +31,7 @@ class CurrentPriceCard extends StatelessWidget {
           mainAxisAlignment: MainAxisAlignment.center,
           children: [
             Text(
-              '₺${price.toStringAsFixed(4)}',
+              AppFormatters.currencyValue(price),
               textAlign: TextAlign.center,
               style: TextStyle(
                 fontSize: isMobile ? 48 : 56,

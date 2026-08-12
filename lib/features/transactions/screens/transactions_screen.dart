@@ -2,7 +2,6 @@ import 'package:flutter/material.dart';
 
 import '../data/transaction_repository.dart';
 import '../models/transaction.dart';
-import '../screens/transaction_form_screen.dart';
 import '../widgets/transaction_list_tile.dart';
 
 class TransactionsScreen extends StatefulWidget {
@@ -44,32 +43,6 @@ class _TransactionsScreenState extends State<TransactionsScreen> {
         _isLoading = false;
       });
     }
-  }
-
-  Future<void> _openAddForm() async {
-    final saved = await Navigator.push<bool>(
-      context,
-      MaterialPageRoute(
-        builder: (context) => const TransactionFormScreen(),
-      ),
-    );
-
-    if (saved == true) {
-      await _loadTransactions();
-      if (!mounted) return;
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('İşlem kaydedildi')),
-      );
-    }
-  }
-
-  Future<void> _openDetail(Transaction transaction) async {
-    await Navigator.push(
-      context,
-      MaterialPageRoute(
-        builder: (context) => TransactionFormScreen(transaction: transaction),
-      ),
-    );
   }
 
   Future<void> _confirmDelete(Transaction transaction) async {
@@ -165,51 +138,25 @@ class _TransactionsScreenState extends State<TransactionsScreen> {
                 textAlign: TextAlign.center,
                 style: TextStyle(color: Colors.grey[600]),
               ),
-              const SizedBox(height: 24),
-              ElevatedButton.icon(
-                onPressed: _openAddForm,
-                icon: const Icon(Icons.add),
-                label: const Text('İşlem Ekle'),
-                style: ElevatedButton.styleFrom(
-                  backgroundColor: Colors.cyan,
-                  foregroundColor: Colors.black,
-                ),
-              ),
             ],
           ),
         ),
       );
     }
 
-    return Stack(
-      children: [
-        RefreshIndicator(
-          onRefresh: _loadTransactions,
-          child: ListView.builder(
-            padding: const EdgeInsets.fromLTRB(16, 16, 16, 88),
-            itemCount: _transactions.length,
-            itemBuilder: (context, index) {
-              final transaction = _transactions[index];
-              return TransactionListTile(
-                transaction: transaction,
-                onTap: () => _openDetail(transaction),
-                onDelete: () => _confirmDelete(transaction),
-              );
-            },
-          ),
-        ),
-        Positioned(
-          right: 16,
-          bottom: 16,
-          child: FloatingActionButton.extended(
-            onPressed: _openAddForm,
-            backgroundColor: Colors.cyan,
-            foregroundColor: Colors.black,
-            icon: const Icon(Icons.add),
-            label: const Text('İşlem Ekle'),
-          ),
-        ),
-      ],
+    return RefreshIndicator(
+      onRefresh: _loadTransactions,
+      child: ListView.builder(
+        padding: const EdgeInsets.all(16),
+        itemCount: _transactions.length,
+        itemBuilder: (context, index) {
+          final transaction = _transactions[index];
+          return TransactionListTile(
+            transaction: transaction,
+            onDelete: () => _confirmDelete(transaction),
+          );
+        },
+      ),
     );
   }
 }

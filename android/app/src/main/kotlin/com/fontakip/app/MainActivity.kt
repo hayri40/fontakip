@@ -1,4 +1,4 @@
-package com.example.fontakip
+package com.fontakip.app
 
 import io.flutter.embedding.android.FlutterActivity
 

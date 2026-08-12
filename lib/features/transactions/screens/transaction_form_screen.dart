@@ -1,15 +1,17 @@
 import 'package:flutter/material.dart';
-import 'package:intl/intl.dart';
 
+import '../../../core/formatters/app_formatters.dart';
 import '../models/transaction.dart';
 import '../models/transaction_type.dart';
 import '../data/transaction_repository.dart';
 
 class TransactionFormScreen extends StatefulWidget {
   final Transaction? transaction;
+  final String fundCode;
 
   const TransactionFormScreen({
     super.key,
+    required this.fundCode,
     this.transaction,
   });
 
@@ -20,7 +22,6 @@ class TransactionFormScreen extends StatefulWidget {
 class _TransactionFormScreenState extends State<TransactionFormScreen> {
   final _formKey = GlobalKey<FormState>();
   final _repository = TransactionRepository();
-  final _fundCodeController = TextEditingController();
   final _quantityController = TextEditingController();
   final _unitPriceController = TextEditingController();
 
@@ -34,9 +35,8 @@ class _TransactionFormScreenState extends State<TransactionFormScreen> {
     super.initState();
     final tx = widget.transaction;
     if (tx != null) {
-      _fundCodeController.text = tx.fundCode;
-      _quantityController.text = tx.quantity.toString();
-      _unitPriceController.text = tx.unitPrice.toString();
+      _quantityController.text = AppFormatters.quantityValue(tx.quantity);
+      _unitPriceController.text = AppFormatters.decimalValue(tx.unitPrice);
       _selectedDate = tx.date;
       _selectedType = tx.type;
     } else {
@@ -47,7 +47,6 @@ class _TransactionFormScreenState extends State<TransactionFormScreen> {
 
   @override
   void dispose() {
-    _fundCodeController.dispose();
     _quantityController.dispose();
     _unitPriceController.dispose();
     super.dispose();
@@ -82,7 +81,7 @@ class _TransactionFormScreenState extends State<TransactionFormScreen> {
 
     try {
       await _repository.add(
-        fundCode: _fundCodeController.text.trim(),
+        fundCode: widget.transaction?.fundCode ?? widget.fundCode.trim(),
         date: _selectedDate,
         type: _selectedType,
         quantity: double.parse(_quantityController.text.replaceAll(',', '.')),
@@ -103,13 +102,6 @@ class _TransactionFormScreenState extends State<TransactionFormScreen> {
 
   @override
   Widget build(BuildContext context) {
-    final dateFormat = DateFormat('dd.MM.yyyy');
-    final totalFormat = NumberFormat.currency(
-      locale: 'tr_TR',
-      symbol: '₺',
-      decimalDigits: 2,
-    );
-
     return Scaffold(
       appBar: AppBar(
         title: Text(_isReadOnly ? 'İşlem Detayı' : 'Yeni İşlem'),
@@ -119,9 +111,7 @@ class _TransactionFormScreenState extends State<TransactionFormScreen> {
         child: ListView(
           padding: const EdgeInsets.all(16),
           children: [
-            _buildDateField(dateFormat),
-            const SizedBox(height: 16),
-            _buildFundCodeField(),
+            _buildDateField(),
             const SizedBox(height: 16),
             _buildTypeSelector(),
             const SizedBox(height: 16),
@@ -129,7 +119,7 @@ class _TransactionFormScreenState extends State<TransactionFormScreen> {
             const SizedBox(height: 16),
             _buildUnitPriceField(),
             const SizedBox(height: 16),
-            _buildTotalField(totalFormat),
+            _buildTotalField(),
             if (!_isReadOnly) ...[
               const SizedBox(height: 24),
               ElevatedButton(
@@ -157,7 +147,7 @@ class _TransactionFormScreenState extends State<TransactionFormScreen> {
     );
   }
 
-  Widget _buildDateField(DateFormat dateFormat) {
+  Widget _buildDateField() {
     return InkWell(
       onTap: _pickDate,
       borderRadius: BorderRadius.circular(8),
@@ -167,28 +157,10 @@ class _TransactionFormScreenState extends State<TransactionFormScreen> {
           border: OutlineInputBorder(),
           suffixIcon: Icon(Icons.calendar_today),
         ),
-        child: Text(dateFormat.format(_selectedDate)),
+        child: Text(
+          '${_selectedDate.day.toString().padLeft(2, '0')}.${_selectedDate.month.toString().padLeft(2, '0')}.${_selectedDate.year}',
+        ),
       ),
-    );
-  }
-
-  Widget _buildFundCodeField() {
-    return TextFormField(
-      controller: _fundCodeController,
-      readOnly: _isReadOnly,
-      textCapitalization: TextCapitalization.characters,
-      decoration: const InputDecoration(
-        labelText: 'Fon Kodu',
-        hintText: 'Örn: KLU',
-        border: OutlineInputBorder(),
-      ),
-      validator: (value) {
-        if (value == null || value.trim().isEmpty) {
-          return 'Fon kodu gerekli';
-        }
-        return null;
-      },
-      onChanged: (_) => setState(() {}),
     );
   }
 
@@ -293,7 +265,7 @@ class _TransactionFormScreenState extends State<TransactionFormScreen> {
     );
   }
 
-  Widget _buildTotalField(NumberFormat totalFormat) {
+  Widget _buildTotalField() {
     final total = _totalAmount;
 
     return Container(
@@ -312,7 +284,7 @@ class _TransactionFormScreenState extends State<TransactionFormScreen> {
             style: TextStyle(color: Colors.grey[400]),
           ),
           Text(
-            total != null ? totalFormat.format(total) : '—',
+            AppFormatters.currencyValue(total),
             style: const TextStyle(
               fontSize: 18,
               fontWeight: FontWeight.bold,

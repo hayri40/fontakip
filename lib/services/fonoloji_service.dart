@@ -2,12 +2,11 @@ import 'dart:convert';
 import 'package:http/http.dart' as http;
 import '../models/fund.dart';
 import '../models/history_point.dart';
+import 'data_source_settings_service.dart';
 
 class FonolojiService {
-  static const String apiKey =
-      'fon_rFKqxTJAur2tAFL_Y_brdrmuahKpVpPX';
-
   Future<Fund> getFund(String code) async {
+    final apiKey = await _resolveApiKey();
     final response = await http.get(
       Uri.parse(
         'https://fonoloji.com/v1/funds/$code',
@@ -27,6 +26,7 @@ class FonolojiService {
   }
 
   Future<List<HistoryPoint>> getHistory(String code) async {
+    final apiKey = await _resolveApiKey();
     final response = await http.get(
       Uri.parse(
         'https://fonoloji.com/v1/funds/$code/history',
@@ -52,5 +52,13 @@ class FonolojiService {
     } else {
       throw Exception('Failed to load history: ${response.statusCode}');
     }
+  }
+
+  Future<String> _resolveApiKey() async {
+    final source = await DataSourceSettingsService.instance.getFundSource();
+    if (!source.isConfigured) {
+      throw const MissingApiConfigException();
+    }
+    return source.apiKey.trim();
   }
 }

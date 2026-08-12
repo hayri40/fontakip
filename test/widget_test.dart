@@ -7,9 +7,9 @@ void main() {
     await tester.pumpWidget(const FonTakipApp());
     await tester.pump();
 
-    expect(find.text('FonTakip'), findsOneWidget);
-    expect(find.text('Ara'), findsOneWidget);
-    expect(find.text('İşlemler'), findsOneWidget);
-    expect(find.text('Favoriler'), findsOneWidget);
+    expect(find.text('Finans Merkezi'), findsOneWidget);
+    expect(find.text('🏠 Genel Portföyüm'), findsOneWidget);
+    expect(find.text('FON'), findsOneWidget);
+    expect(find.text('HİSSE'), findsOneWidget);
   });
 }

@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:fl_chart/fl_chart.dart';
+import '../core/formatters/app_formatters.dart';
 import '../models/history_point.dart';
 
 class EnhancedFundHistoryChart extends StatefulWidget {
@@ -222,7 +223,7 @@ class _EnhancedFundHistoryChartState extends State<EnhancedFundHistoryChart> {
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
                 Text(
-                  '₺${lastPrice.toStringAsFixed(4)}',
+                  AppFormatters.currencyValue(lastPrice),
                   style: TextStyle(
                     fontSize: isMobile ? 28 : 32,
                     fontWeight: FontWeight.bold,
@@ -235,7 +236,7 @@ class _EnhancedFundHistoryChartState extends State<EnhancedFundHistoryChart> {
                     Icon(priceIcon, color: priceColor, size: 16),
                     const SizedBox(width: 4),
                     Text(
-                      '${percentageChange >= 0 ? '+' : ''}${percentageChange.toStringAsFixed(2)}%',
+                      AppFormatters.signedPercentValue(percentageChange),
                       style: TextStyle(
                         fontSize: 14,
                         color: priceColor,
@@ -266,7 +267,7 @@ class _EnhancedFundHistoryChartState extends State<EnhancedFundHistoryChart> {
                         ),
                       ),
                       Text(
-                        '₺${highPrice.toStringAsFixed(4)}',
+                        AppFormatters.currencyValue(highPrice),
                         style: const TextStyle(
                           fontSize: 12,
                           fontWeight: FontWeight.bold,
@@ -286,7 +287,7 @@ class _EnhancedFundHistoryChartState extends State<EnhancedFundHistoryChart> {
                         ),
                       ),
                       Text(
-                        '₺${lowPrice.toStringAsFixed(4)}',
+                        AppFormatters.currencyValue(lowPrice),
                         style: const TextStyle(
                           fontSize: 12,
                           fontWeight: FontWeight.bold,
@@ -387,7 +388,7 @@ class _EnhancedFundHistoryChartState extends State<EnhancedFundHistoryChart> {
               reservedSize: leftChartMargin,
               getTitlesWidget: (value, meta) {
                 return Text(
-                  '₺${value.toStringAsFixed(2)}',
+                  AppFormatters.currencyValue(value),
                   style: TextStyle(
                     color: Colors.grey[500],
                     fontSize: 10,
@@ -449,7 +450,7 @@ class _EnhancedFundHistoryChartState extends State<EnhancedFundHistoryChart> {
               return touchedSpots.map((spot) {
                 final date = _filteredHistory[spot.x.toInt()].date;
                 return LineTooltipItem(
-                  '₺${spot.y.toStringAsFixed(4)}\n${date.day}/${date.month}/${date.year}',
+                  '${AppFormatters.currencyValue(spot.y)}\n${date.day}/${date.month}/${date.year}',
                   TextStyle(
                     color: Colors.cyan,
                     fontWeight: FontWeight.bold,

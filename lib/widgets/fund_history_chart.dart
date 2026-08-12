@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:fl_chart/fl_chart.dart';
+import '../core/formatters/app_formatters.dart';
 import '../models/history_point.dart';
 
 class EnhancedFundHistoryChart extends StatefulWidget {
@@ -204,7 +205,7 @@ class _EnhancedFundHistoryChartState extends State<EnhancedFundHistoryChart> {
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
                     Text(
-                      '₺${lastPrice.toStringAsFixed(4)}',
+                      AppFormatters.currencyValue(lastPrice),
                       style: const TextStyle(
                         fontSize: 28,
                         fontWeight: FontWeight.bold,
@@ -213,7 +214,7 @@ class _EnhancedFundHistoryChartState extends State<EnhancedFundHistoryChart> {
                     ),
                     const SizedBox(height: 4),
                     Text(
-                      '${changePercent >= 0 ? '+' : ''}${changePercent.toStringAsFixed(2)}%',
+                      AppFormatters.signedPercentValue(changePercent),
                       style: TextStyle(
                         fontSize: 16,
                         fontWeight: FontWeight.w600,
@@ -235,7 +236,7 @@ class _EnhancedFundHistoryChartState extends State<EnhancedFundHistoryChart> {
                           ),
                         ),
                         Text(
-                          '₺${maxPrice.toStringAsFixed(4)}',
+                          AppFormatters.currencyValue(maxPrice),
                           style: const TextStyle(
                             fontSize: 12,
                             fontWeight: FontWeight.bold,
@@ -255,7 +256,7 @@ class _EnhancedFundHistoryChartState extends State<EnhancedFundHistoryChart> {
                           ),
                         ),
                         Text(
-                          '₺${minPrice.toStringAsFixed(4)}',
+                          AppFormatters.currencyValue(minPrice),
                           style: const TextStyle(
                             fontSize: 12,
                             fontWeight: FontWeight.bold,
@@ -329,7 +330,7 @@ class _EnhancedFundHistoryChartState extends State<EnhancedFundHistoryChart> {
                         interval: (maxPrice - minPrice) / 5,
                         getTitlesWidget: (value, meta) {
                           return Text(
-                            '₺${value.toStringAsFixed(2)}',
+                            AppFormatters.currencyValue(value),
                             style: const TextStyle(
                               color: Colors.white60,
                               fontSize: 10,
@@ -488,4 +489,3 @@ class _EnhancedFundHistoryChartState extends State<EnhancedFundHistoryChart> {
     );
   }
 }
-

@@ -1,3 +1,4 @@
+import '../services/fonoloji_service.dart';
 import '../models/holding.dart';
 import '../features/transactions/data/transaction_repository.dart';
 import '../features/transactions/models/transaction.dart';
@@ -5,6 +6,7 @@ import '../features/transactions/models/transaction_type.dart';
 
 class PortfolioService {
   final _repository = TransactionRepository();
+  final _fonoloji = FonolojiService();
 
   Future<List<Holding>> getHoldings() async {
     final transactions = await _repository.getAll();
@@ -20,7 +22,7 @@ class PortfolioService {
       grouped[transaction.fundCode]!.add(transaction);
     }
 
-    final List<Holding> holdings = [];
+    final List<Holding> tempHoldings = [];
 
     for (final entry in grouped.entries) {
       final fundCode = entry.key;
@@ -49,15 +51,67 @@ class PortfolioService {
       final averageCost =
           totalBuyCost / totalBuyQuantity;
 
-      holdings.add(
+      final costValue =
+          netQuantity * averageCost;
+
+      final fund = await _fonoloji.getFund(fundCode);
+
+      final currentPrice = fund.currentPrice;
+
+      final currentValue =
+          netQuantity * currentPrice;
+
+      final profitLoss =
+          currentValue - costValue;
+
+      final double profitLossPercent =
+      costValue == 0
+          ? 0.0
+          : ((profitLoss / costValue) * 100);
+
+      tempHoldings.add(
         Holding(
           fundCode: fundCode,
           quantity: netQuantity,
           averageCost: averageCost,
+
+          currentPrice: currentPrice,
+          currentValue: currentValue,
+          costValue: costValue,
+          profitLoss: profitLoss,
+          profitLossPercent: profitLossPercent,
+
+          portfolioSharePercent: 0,
         ),
       );
     }
 
-    return holdings;
+    final totalPortfolioValue = tempHoldings.fold(
+      0.0,
+          (sum, item) => sum + item.currentValue,
+    );
+
+    return tempHoldings.map((holding) {
+      final sharePercent =
+      totalPortfolioValue == 0
+          ? 0.0
+          : (holding.currentValue /
+          totalPortfolioValue) *
+          100;
+
+      return Holding(
+        fundCode: holding.fundCode,
+        quantity: holding.quantity,
+        averageCost: holding.averageCost,
+
+        currentPrice: holding.currentPrice,
+        currentValue: holding.currentValue,
+        costValue: holding.costValue,
+        profitLoss: holding.profitLoss,
+        profitLossPercent: holding.profitLossPercent,
+
+        portfolioSharePercent: sharePercent,
+      );
+    }).toList();
   }
 }

@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 
+import '../core/formatters/app_formatters.dart';
 import '../models/holding.dart';
 import '../services/portfolio_service.dart';
 
@@ -17,6 +18,7 @@ class _PortfolioDashboardScreenState
 
   List<Holding> _holdings = [];
   bool _loading = true;
+  DateTime? _lastUpdated;
 
   @override
   void initState() {
@@ -25,11 +27,16 @@ class _PortfolioDashboardScreenState
   }
 
   Future<void> _loadPortfolio() async {
+    setState(() {
+      _loading = true;
+    });
+
     final holdings = await _service.getHoldings();
 
     setState(() {
       _holdings = holdings;
       _loading = false;
+      _lastUpdated = DateTime.now();
     });
   }
 
@@ -43,37 +50,201 @@ class _PortfolioDashboardScreenState
 
     if (_holdings.isEmpty) {
       return const Center(
-        child: Text(
-          'Henüz portföy oluşmadı',
-        ),
+        child: Text('Henüz portföy oluşmadı'),
       );
     }
 
-    return ListView.builder(
-      padding: const EdgeInsets.all(16),
-      itemCount: _holdings.length,
-      itemBuilder: (context, index) {
-        final holding = _holdings[index];
+    final totalCost = _holdings.fold(
+      0.0,
+          (sum, item) => sum + item.costValue,
+    );
 
-        return Card(
-          margin: const EdgeInsets.only(bottom: 12),
-          child: ListTile(
-            title: Text(
-              holding.fundCode,
-              style: const TextStyle(
-                fontWeight: FontWeight.bold,
-              ),
-            ),
-            subtitle: Text(
-              'Ortalama Maliyet: '
-                  '${holding.averageCost.toStringAsFixed(4)} TL',
-            ),
-            trailing: Text(
-              '${holding.quantity.toInt()} Adet',
+    final totalCurrent = _holdings.fold(
+      0.0,
+          (sum, item) => sum + item.currentValue,
+    );
+
+    final totalProfitLoss = _holdings.fold(
+      0.0,
+          (sum, item) => sum + item.profitLoss,
+    );
+
+    final totalProfitLossPercent = totalCost == 0
+        ? 0.0
+        : (totalProfitLoss / totalCost) * 100;
+
+    return ListView(
+      padding: const EdgeInsets.all(16),
+      children: [
+        Card(
+          margin: const EdgeInsets.only(bottom: 16),
+          child: Padding(
+            padding: const EdgeInsets.all(20),
+            child: Column(
+              crossAxisAlignment:
+              CrossAxisAlignment.start,
+              children: [
+                Row(
+                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                  children: [
+                    const Text(
+                      'Toplam Portföy',
+                      style: TextStyle(
+                        fontSize: 14,
+                        color: Colors.grey,
+                      ),
+                    ),
+
+                    IconButton(
+                      icon: const Icon(Icons.refresh),
+                      tooltip: 'Yenile',
+                      onPressed: _loadPortfolio,
+                    ),
+                  ],
+                ),
+
+                const SizedBox(height: 8),
+
+                Text(
+                  AppFormatters.currencyValue(totalCurrent),
+                  style: const TextStyle(
+                    fontSize: 32,
+                    fontWeight: FontWeight.bold,
+                  ),
+                ),
+
+                const SizedBox(height: 10),
+
+                Text(
+                  'Maliyet: ${AppFormatters.currencyValue(totalCost)}',
+                  style: TextStyle(
+                    color: Colors.grey[400],
+                    fontSize: 14,
+                    fontWeight: FontWeight.w600,
+                  ),
+                ),
+                const SizedBox(height: 6),
+
+                Text(
+                  'K/Z: ${AppFormatters.signedCurrencyValue(totalProfitLoss)} '
+                      '(${AppFormatters.percentValue(totalProfitLossPercent)})',
+                  style: TextStyle(
+                    color: totalProfitLoss >= 0
+                        ? Colors.green
+                        : Colors.red,
+                    fontSize: 18,
+                    fontWeight: FontWeight.bold,
+                  ),
+                ),
+                const SizedBox(height: 8),
+
+                Text(
+                  _lastUpdated == null
+                      ? ''
+                      : 'Son güncelleme: '
+                      '${_lastUpdated!.hour.toString().padLeft(2, '0')}:'
+                      '${_lastUpdated!.minute.toString().padLeft(2, '0')}',
+                  style: const TextStyle(
+                    color: Colors.grey,
+                    fontSize: 12,
+                  ),
+                ),
+              ],
             ),
           ),
-        );
-      },
+        ),
+
+        ..._holdings.map((holding) {
+          return Card(
+            margin: const EdgeInsets.only(bottom: 12),
+            child: Padding(
+              padding: const EdgeInsets.all(16),
+              child: Row(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment:
+                      CrossAxisAlignment.start,
+                      children: [
+                        Text(
+                          holding.fundCode,
+                          style: const TextStyle(
+                            fontSize: 20,
+                            fontWeight: FontWeight.bold,
+                          ),
+                        ),
+
+                        const SizedBox(height: 10),
+
+                        Text(
+                          'Ort. Maliyet: ${AppFormatters.currencyValue(holding.averageCost)}',
+                        ),
+
+                        const SizedBox(height: 4),
+
+                        Text(
+                          'Güncel: ${AppFormatters.currencyValue(holding.currentValue)}',
+                          style: const TextStyle(
+                            color: Colors.cyan,
+                          ),
+                        ),
+
+                        const SizedBox(height: 4),
+
+                        Text(
+                          'Maliyet: ${AppFormatters.currencyValue(holding.costValue)}',
+                          style: const TextStyle(
+                            color: Colors.orange,
+                          ),
+                        ),
+
+                      ],
+                    ),
+                  ),
+
+                  Column(
+                    crossAxisAlignment: CrossAxisAlignment.end,
+                    children: [
+                      Text(
+                        AppFormatters.quantityLabel(holding.quantity),
+                        style: const TextStyle(
+                          fontSize: 18,
+                          fontWeight: FontWeight.bold,
+                        ),
+                      ),
+
+                      const SizedBox(height: 6),
+
+                      Text(
+                        'Pay ${AppFormatters.percentValue(holding.portfolioSharePercent)}',
+                        style: const TextStyle(
+                          color: Colors.amber,
+                          fontWeight: FontWeight.bold,
+                        ),
+                      ),
+
+                      const SizedBox(height: 10),
+
+                      Text(
+                        '${AppFormatters.signedCurrencyValue(holding.profitLoss)} '
+                            '(${AppFormatters.percentValue(holding.profitLossPercent)})',
+                        style: TextStyle(
+                          color: holding.profitLoss >= 0
+                              ? Colors.green
+                              : Colors.red,
+                          fontWeight: FontWeight.w600,
+                        ),
+                        textAlign: TextAlign.right,
+                      ),
+                    ],
+                  )
+                ],
+              ),
+            ),
+          );
+        }),
+      ],
     );
   }
 }

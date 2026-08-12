@@ -1,5 +1,7 @@
 import 'package:flutter/material.dart';
 
+import '../core/formatters/app_formatters.dart';
+
 class ReturnCard extends StatelessWidget {
   final String title;
   final double returnValue;
@@ -18,7 +20,7 @@ class ReturnCard extends StatelessWidget {
     final returnColor = isPositive ? Colors.green : Colors.red;
     final returnIcon = isPositive ? Icons.trending_up : Icons.trending_down;
     final returnPercentage = returnValue * 100;
-    final returnText = '${isPositive ? '+' : ''}${returnPercentage.toStringAsFixed(2)}%';
+    final returnText = AppFormatters.signedPercentValue(returnPercentage);
 
     return Card(
       margin: EdgeInsets.zero,

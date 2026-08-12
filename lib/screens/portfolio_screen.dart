@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:shared_preferences/shared_preferences.dart';
+import '../core/formatters/app_formatters.dart';
 import '../models/fund.dart';
 import '../models/history_point.dart';
 import '../models/favorites_manager.dart';
@@ -8,6 +9,7 @@ import '../widgets/search_fund_box.dart';
 import '../widgets/favorites_tab.dart';
 import '../widgets/enhanced_fund_history_chart.dart';
 import '../features/transactions/screens/transactions_screen.dart';
+import '../features/transactions/screens/transaction_form_screen.dart';
 import 'portfolio_dashboard_screen.dart';
 
 class PortfolioScreen extends StatefulWidget {
@@ -79,7 +81,7 @@ class _PortfolioScreenState extends State<PortfolioScreen> {
       _loadHistory(code.toUpperCase());
     } catch (e) {
       setState(() {
-        _errorMessage = 'Error loading fund: ${e.toString()}';
+        _errorMessage = e.toString();
         _currentFund = null;
         _historyLoading = false;
       });
@@ -95,17 +97,20 @@ class _PortfolioScreenState extends State<PortfolioScreen> {
       final history = await _service.getHistory(code);
       print('✅ History loaded: ${history.length} points');
       if (history.isNotEmpty) {
-        print('   First: ${history.first.date} = ₺${history.first.price}');
-        print('   Last: ${history.last.date} = ₺${history.last.price}');
+        print(
+          '   First: ${history.first.date} = ${AppFormatters.currencyValue(history.first.price)}',
+        );
+        print(
+          '   Last: ${history.last.date} = ${AppFormatters.currencyValue(history.last.price)}',
+        );
       }
       setState(() {
         _history = history;
         _historyError = null;
       });
     } catch (e) {
-      print('❌ History error: $e');
       setState(() {
-        _historyError = 'Failed to load chart: ${e.toString()}';
+        _historyError = e.toString();
         _history = [];
       });
     } finally {
@@ -123,6 +128,24 @@ class _PortfolioScreenState extends State<PortfolioScreen> {
       return;
     }
 
+    Future<void> _openTransactionForm() async {
+      if (_currentFund == null) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('Lütfen önce bir fon yükleyin')),
+        );
+        return;
+      }
+
+      await Navigator.push(
+        context,
+        MaterialPageRoute(
+          builder: (_) => TransactionFormScreen(
+            fundCode: _currentFund!.code,
+          ),
+        ),
+      );
+    }
+
     await _favoritesManager.toggleFavorite(_currentFund!.code);
 
     setState(() {});
@@ -132,6 +155,24 @@ class _PortfolioScreenState extends State<PortfolioScreen> {
       SnackBar(
         content: Text(
           isFav ? 'Added to favorites' : 'Removed from favorites',
+        ),
+      ),
+    );
+  }
+
+  Future<void> _openTransactionForm() async {
+    if (_currentFund == null) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Lütfen önce bir fon yükleyin')),
+      );
+      return;
+    }
+
+    await Navigator.push(
+      context,
+      MaterialPageRoute(
+        builder: (_) => TransactionFormScreen(
+          fundCode: _currentFund!.code,
         ),
       ),
     );
@@ -231,6 +272,7 @@ class _PortfolioScreenState extends State<PortfolioScreen> {
             SearchFundBox(
               controller: _searchController,
               onSearch: () => _loadFund(_searchController.text),
+              onProcess: _openTransactionForm,
               onAddFavorite: _toggleFavorite,
               isFavorite: _currentFund != null && 
                   _favoritesManager.isFavorite(_currentFund!.code),
@@ -251,6 +293,7 @@ class _PortfolioScreenState extends State<PortfolioScreen> {
             SearchFundBox(
               controller: _searchController,
               onSearch: () => _loadFund(_searchController.text),
+              onProcess: _openTransactionForm,
               onAddFavorite: _toggleFavorite,
               isFavorite: _currentFund != null && 
                   _favoritesManager.isFavorite(_currentFund!.code),
@@ -282,6 +325,7 @@ class _PortfolioScreenState extends State<PortfolioScreen> {
       return SearchFundBox(
         controller: _searchController,
         onSearch: () => _loadFund(_searchController.text),
+        onProcess: _openTransactionForm,
         onAddFavorite: _toggleFavorite,
         isFavorite: false,
       );
@@ -294,6 +338,7 @@ class _PortfolioScreenState extends State<PortfolioScreen> {
           SearchFundBox(
             controller: _searchController,
             onSearch: () => _loadFund(_searchController.text),
+            onProcess: _openTransactionForm,
             onAddFavorite: _toggleFavorite,
             isFavorite: _favoritesManager.isFavorite(_currentFund!.code),
           ),
@@ -319,7 +364,7 @@ class _PortfolioScreenState extends State<PortfolioScreen> {
                   textBaseline: TextBaseline.alphabetic,
                   children: [
                     Text(
-                      '₺${_currentFund!.currentPrice.toStringAsFixed(4)}',
+                      AppFormatters.currencyValue(_currentFund!.currentPrice),
                       style: const TextStyle(
                         fontSize: 36,
                         fontWeight: FontWeight.bold,
@@ -336,7 +381,7 @@ class _PortfolioScreenState extends State<PortfolioScreen> {
                         borderRadius: BorderRadius.circular(6),
                       ),
                       child: Text(
-                        '${_currentFund!.return1Y >= 0 ? '+' : ''}${_currentFund!.return1Y.toStringAsFixed(2)}%',
+                        AppFormatters.signedPercentValue(_currentFund!.return1Y),
                         style: TextStyle(
                           fontSize: 18,
                           fontWeight: FontWeight.bold,
@@ -371,7 +416,7 @@ class _PortfolioScreenState extends State<PortfolioScreen> {
                   padding: const EdgeInsets.only(bottom: 16),
                   child: _buildMetricRow(
                     'Risk Score',
-                    _currentFund!.riskScore.toString(),
+                    AppFormatters.decimalValue(_currentFund!.riskScore),
                     _getRiskColor(_currentFund!.riskScore),
                     _getRiskIcon(_currentFund!.riskScore),
                   ),
@@ -381,7 +426,7 @@ class _PortfolioScreenState extends State<PortfolioScreen> {
                   padding: const EdgeInsets.only(bottom: 16),
                   child: _buildMetricRow(
                     'Real Return',
-                    '${_currentFund!.realReturn1Y >= 0 ? '+' : ''}${_currentFund!.realReturn1Y.toStringAsFixed(2)}%',
+                    AppFormatters.signedPercentValue(_currentFund!.realReturn1Y),
                     _currentFund!.realReturn1Y >= 0 ? Colors.green : Colors.red,
                     _currentFund!.realReturn1Y >= 0
                         ? Icons.trending_up
@@ -391,7 +436,7 @@ class _PortfolioScreenState extends State<PortfolioScreen> {
                 // Sharpe ratio
                 _buildMetricRow(
                   'Sharpe Ratio',
-                  _currentFund!.sharpe90.toStringAsFixed(2),
+                  AppFormatters.decimalValue(_currentFund!.sharpe90),
                   Colors.cyan,
                   Icons.auto_graph,
                 ),

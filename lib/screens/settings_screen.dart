@@ -52,6 +52,8 @@ class _SettingsScreenState extends State<SettingsScreen> {
   bool _updateAvailable = false;
   bool _updateCheckAttempted = false;
   bool _updateCheckFailed = false;
+  String? _apkDownloadPath;
+  String? _apkInstallError;
   AuthState _cloudAuthState = const AuthState(
     isSignedIn: false,
     provider: 'google',
@@ -345,6 +347,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
       _downloadingUpdate = true;
       _downloadProgress = 0;
       _downloadTotal = 0;
+      _apkInstallError = null;
     });
 
     try {
@@ -373,29 +376,36 @@ class _SettingsScreenState extends State<SettingsScreen> {
         return;
       }
 
-      final installSuccess = await _updateDownloadService.installApk(apkPath);
+      setState(() {
+        _apkDownloadPath = apkPath;
+      });
+
+      final installResult = await _updateDownloadService.installApk(apkPath);
       if (!mounted) {
         return;
       }
 
-      if (installSuccess) {
+      if (installResult == null ||
+          installResult.contains('Kurulum başlatıldı')) {
         setState(() {
           _downloadingUpdate = false;
+          _apkInstallError = null;
         });
       } else {
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('⚠️ Kurulum başlatılamadı')),
-        );
         setState(() {
           _downloadingUpdate = false;
+          _apkInstallError = installResult;
         });
+        ScaffoldMessenger.of(
+          context,
+        ).showSnackBar(SnackBar(content: Text('⚠️ $installResult')));
       }
-    } catch (_) {
+    } catch (e) {
       if (!mounted) {
         return;
       }
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('⚠️ Güncelleme indirilemedi')),
+        SnackBar(content: Text('⚠️ Güncelleme indirilemedi: ${e.toString()}')),
       );
       setState(() {
         _downloadingUpdate = false;
@@ -722,6 +732,76 @@ class _SettingsScreenState extends State<SettingsScreen> {
                                 label: const Text('APK İndir'),
                               ),
                             ),
+                          if (_apkDownloadPath != null) ...[
+                            const SizedBox(height: 12),
+                            Container(
+                              width: double.infinity,
+                              padding: const EdgeInsets.all(12),
+                              decoration: BoxDecoration(
+                                color: Colors.green.shade50,
+                                border: Border.all(
+                                  color: Colors.green.shade300,
+                                ),
+                                borderRadius: BorderRadius.circular(8),
+                              ),
+                              child: Column(
+                                crossAxisAlignment: CrossAxisAlignment.start,
+                                mainAxisSize: MainAxisSize.min,
+                                children: [
+                                  const Text(
+                                    '✅ APK İndirildi',
+                                    style: TextStyle(
+                                      color: Colors.green,
+                                      fontWeight: FontWeight.w600,
+                                    ),
+                                  ),
+                                  const SizedBox(height: 8),
+                                  const Text(
+                                    'Dosya Konumu:',
+                                    style: TextStyle(fontSize: 12),
+                                  ),
+                                  Text(
+                                    _apkDownloadPath!,
+                                    style: const TextStyle(
+                                      fontSize: 11,
+                                      fontFamily: 'monospace',
+                                      color: Colors.grey,
+                                    ),
+                                  ),
+                                ],
+                              ),
+                            ),
+                          ],
+                          if (_apkInstallError != null) ...[
+                            const SizedBox(height: 12),
+                            Container(
+                              width: double.infinity,
+                              padding: const EdgeInsets.all(12),
+                              decoration: BoxDecoration(
+                                color: Colors.red.shade50,
+                                border: Border.all(color: Colors.red.shade300),
+                                borderRadius: BorderRadius.circular(8),
+                              ),
+                              child: Column(
+                                crossAxisAlignment: CrossAxisAlignment.start,
+                                mainAxisSize: MainAxisSize.min,
+                                children: [
+                                  const Text(
+                                    '⚠️ Kurulum Hatası',
+                                    style: TextStyle(
+                                      color: Colors.red,
+                                      fontWeight: FontWeight.w600,
+                                    ),
+                                  ),
+                                  const SizedBox(height: 4),
+                                  Text(
+                                    _apkInstallError!,
+                                    style: const TextStyle(fontSize: 12),
+                                  ),
+                                ],
+                              ),
+                            ),
+                          ],
                         ],
                       ] else ...[
                         const SizedBox(height: 8),

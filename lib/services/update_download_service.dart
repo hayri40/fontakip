@@ -1,11 +1,12 @@
 import 'dart:io';
 
+import 'package:flutter/services.dart';
 import 'package:http/http.dart' as http;
 import 'package:path_provider/path_provider.dart';
-import 'package:url_launcher/url_launcher.dart';
 
 class UpdateDownloadService {
   static const String _apkFileName = 'fontakip_update.apk';
+  static const platform = MethodChannel('com.fontakip.app/update');
 
   String formatFileSize(int bytes) {
     if (bytes < 1024) {
@@ -54,21 +55,21 @@ class UpdateDownloadService {
       final apkFile = File('${downloadDir.path}/$_apkFileName');
       await apkFile.writeAsBytes(bytes);
       return apkFile.path;
-    } catch (_) {
+    } catch (e) {
       return null;
     }
   }
 
-  Future<bool> installApk(String apkPath) async {
+  Future<String?> installApk(String apkPath) async {
     try {
-      final apkUri = Uri.file(apkPath);
-      final result = await launchUrl(
-        apkUri,
-        mode: LaunchMode.externalApplication,
-      );
+      final result = await platform.invokeMethod<String>('installApk', {
+        'apkPath': apkPath,
+      });
       return result;
-    } catch (_) {
-      return false;
+    } on PlatformException catch (e) {
+      return 'Hata: ${e.message}';
+    } catch (e) {
+      return 'Kurulum başlatılamadı: ${e.toString()}';
     }
   }
 }

@@ -1,0 +1,10 @@
+{
+  "version": "1.0.1",
+  "releaseDate": "2026-08-12",
+  "notes": [
+    "Google giriş altyapısı eklendi",
+    "Bulut yedekleme altyapısı eklendi",
+    "Güncelleme sistemi geliştirildi"
+  ],
+  "apkUrl": ""
+}

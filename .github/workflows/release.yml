@@ -1,0 +1,114 @@
+name: Build and Release
+
+on:
+  push:
+    branches:
+      - master
+    paths:
+      - 'pubspec.yaml'
+      - 'lib/**'
+      - 'android/**'
+      - '.github/workflows/release.yml'
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+        with:
+          token: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Setup Flutter
+        uses: subosito/flutter-action@v2
+        with:
+          flutter-version: '3.22.0'
+          channel: 'stable'
+
+      - name: Get dependencies
+        run: flutter pub get
+
+      - name: Extract version from pubspec.yaml
+        id: version
+        run: |
+          VERSION=$(grep '^version:' pubspec.yaml | awk '{print $2}' | cut -d'+' -f1)
+          echo "version=$VERSION" >> $GITHUB_OUTPUT
+          echo "tag=v$VERSION" >> $GITHUB_OUTPUT
+          echo "Current version: $VERSION"
+
+      - name: Build APK
+        run: flutter build apk --release
+
+      - name: Upload build logs on failure
+        if: failure()
+        run: |
+          echo "Build failed. Check logs above."
+          exit 1
+
+      - name: Create Release
+        id: create_release
+        uses: actions/create-release@v1
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        with:
+          tag_name: ${{ steps.version.outputs.tag }}
+          release_name: FontTakip ${{ steps.version.outputs.version }}
+          body: |
+            ## FontTakip ${{ steps.version.outputs.version }}
+            
+            Otomatik olarak oluşturulan release.
+            
+            **APK Download:** Aşağıdaki release dosyasını indirin.
+          draft: false
+          prerelease: false
+
+      - name: Upload APK to Release
+        uses: actions/upload-release-asset@v1
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        with:
+          upload_url: ${{ steps.create_release.outputs.upload_url }}
+          asset_path: ./build/app/outputs/flutter-apk/app-release.apk
+          asset_name: fontakip-${{ steps.version.outputs.version }}.apk
+          asset_content_type: application/vnd.android.package-archive
+
+      - name: Get Release APK Download URL
+        id: apk_url
+        run: |
+          APK_URL="https://github.com/${{ github.repository }}/releases/download/${{ steps.version.outputs.tag }}/fontakip-${{ steps.version.outputs.version }}.apk"
+          echo "apk_url=$APK_URL" >> $GITHUB_OUTPUT
+          echo "APK URL: $APK_URL"
+
+      - name: Get current date
+        id: date
+        run: |
+          DATE=$(date +"%Y-%m-%d")
+          echo "date=$DATE" >> $GITHUB_OUTPUT
+
+      - name: Update version.json
+        run: |
+          cat > version.json << 'EOF'
+          {
+            "version": "${{ steps.version.outputs.version }}",
+            "releaseDate": "${{ steps.date.outputs.date }}",
+            "notes": [
+              "Otomatik olarak GitHub Actions tarafından oluşturulan release"
+            ],
+            "apkUrl": "${{ steps.apk_url.outputs.apk_url }}"
+          }
+          EOF
+          cat version.json
+
+      - name: Commit and push version.json
+        run: |
+          git config --local user.email "action@github.com"
+          git config --local user.name "GitHub Action"
+          git add version.json
+          git commit -m "Update version.json for release ${{ steps.version.outputs.tag }} [skip ci]"
+          git push
+
+      - name: Notify on success
+        run: |
+          echo "✅ Release ${{ steps.version.outputs.tag }} completed successfully!"
+          echo "📦 APK: ${{ steps.apk_url.outputs.apk_url }}"

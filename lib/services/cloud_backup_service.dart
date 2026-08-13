@@ -142,7 +142,15 @@ class GoogleCloudBackupService implements CloudBackupService {
 
       final state = _buildAuthState(session.user);
       await _persistAuthState(state);
-      await _persistBackupInfo(_buildSignedInInfo(user: session.user));
+      final cachedInfo = await _getCachedBackupInfo();
+      await _persistBackupInfo(
+        _buildSignedInInfo(
+          user: session.user,
+          hasBackup: cachedInfo?.hasBackup ?? false,
+          lastUpdatedAt: cachedInfo?.lastUpdatedAt,
+          backupSizeBytes: cachedInfo?.backupSizeBytes,
+        ),
+      );
       return state;
     } on SocketException {
       throw const CloudBackupException('İnternet bağlantısı bulunamadı');
@@ -399,7 +407,17 @@ class GoogleCloudBackupService implements CloudBackupService {
 
   Future<void> _ensureDriveScopeGranted() async {
     try {
-      final hasDriveScope = await _canAccessScopes(const [_driveScope]);
+      bool hasDriveScope = false;
+      try {
+        hasDriveScope = await _canAccessScopes(const [_driveScope]);
+      } on UnimplementedError catch (error, stackTrace) {
+        developer.log(
+          'canAccessScopes is not implemented on this platform; falling back to requestScopes',
+          name: 'GoogleCloudBackupService',
+          error: error,
+          stackTrace: stackTrace,
+        );
+      }
       if (hasDriveScope) {
         return;
       }

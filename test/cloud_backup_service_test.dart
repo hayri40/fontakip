@@ -94,6 +94,49 @@ void main() {
     expect(requests.last.url.path, contains('/existing-backup'));
   });
 
+  test(
+    'uploadBackup falls back to requestScopes when canAccessScopes is unavailable',
+    () async {
+      final service = GoogleCloudBackupService(
+        backupService: _FakeBackupService(exportJson: '{"hello":"world"}'),
+        httpClient: MockClient((request) async {
+          if (request.method == 'GET') {
+            return http.Response(
+              jsonEncode({
+                'files': [
+                  {
+                    'id': 'existing-backup',
+                    'modifiedTime': '2026-08-13T12:00:00.000Z',
+                    'size': '12',
+                  },
+                ],
+              }),
+              200,
+            );
+          }
+
+          return http.Response(
+            jsonEncode({
+              'id': 'existing-backup',
+              'modifiedTime': '2026-08-13T13:00:00.000Z',
+              'size': '17',
+            }),
+            200,
+          );
+        }),
+        interactiveSignIn: () async => buildSession(),
+        silentSignIn: () async => buildSession(),
+        canAccessScopes: (_) => Future<bool>.error(UnimplementedError()),
+        requestScopes: (_) async => true,
+      );
+
+      final info = await service.uploadBackup();
+
+      expect(info.hasBackup, isTrue);
+      expect(info.backupSizeBytes, 17);
+    },
+  );
+
   test('downloadBackup returns latest AppData content', () async {
     final service = GoogleCloudBackupService(
       backupService: _FakeBackupService(exportJson: '{}'),
@@ -170,5 +213,42 @@ void main() {
         ),
       ),
     );
+  });
+
+  test('signIn preserves cached backup metadata values', () async {
+    SharedPreferences.setMockInitialValues(<String, Object>{
+      'cloud_backup_info_state': jsonEncode({
+        'provider': 'google',
+        'isSignedIn': true,
+        'hasBackup': true,
+        'lastUpdatedAt': '2026-08-13T14:00:00.000Z',
+        'backupSizeBytes': 42,
+        'user': {
+          'id': 'old-user',
+          'email': 'old@example.com',
+          'provider': 'google',
+          'createdAt': '2026-08-13T10:00:00.000Z',
+          'displayName': 'Old User',
+        },
+      }),
+    });
+
+    final service = GoogleCloudBackupService(
+      backupService: _FakeBackupService(exportJson: '{}'),
+      httpClient: MockClient((request) async => http.Response('{}', 200)),
+      interactiveSignIn: () async => buildSession(),
+      silentSignIn: () async => buildSession(),
+      canAccessScopes: (_) async => true,
+      requestScopes: (_) async => true,
+    );
+
+    await service.signIn();
+    final prefs = await SharedPreferences.getInstance();
+    final raw = prefs.getString('cloud_backup_info_state');
+    final decoded = jsonDecode(raw!) as Map<String, dynamic>;
+
+    expect(decoded['hasBackup'], isTrue);
+    expect(decoded['backupSizeBytes'], 42);
+    expect(decoded['lastUpdatedAt'], '2026-08-13T14:00:00.000Z');
   });
 }

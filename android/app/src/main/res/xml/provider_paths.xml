@@ -1,7 +1,6 @@
 <?xml version="1.0" encoding="utf-8"?>
 <paths xmlns:android="http://schemas.android.com/apk/res/android">
-    <!-- Provide access to Downloads directory -->
-    <external-path name="downloads" path="Download/" />
-    <!-- Alternative: cache directory -->
-    <cache-path name="cache" path="/" />
+    <external-path name="public_downloads" path="Download/" />
+    <external-files-path name="app_downloads" path="Download/" />
+    <cache-path name="cache" path="." />
 </paths>

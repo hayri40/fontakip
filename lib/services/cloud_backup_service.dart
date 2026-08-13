@@ -2,6 +2,7 @@ import 'dart:convert';
 import 'dart:developer' as developer;
 import 'dart:io';
 
+import 'package:flutter/services.dart';
 import 'package:google_sign_in/google_sign_in.dart';
 import 'package:http/http.dart' as http;
 import 'package:shared_preferences/shared_preferences.dart';
@@ -65,11 +66,11 @@ class GoogleCloudBackupService implements CloudBackupService {
   late final Future<DriveUserSession?> Function() _interactiveSignIn;
   late final Future<DriveUserSession?> Function() _silentSignIn;
   late final Future<void> Function() _signOutAction;
+  late final Future<bool> Function(List<String> scopes) _canAccessScopes;
+  late final Future<bool> Function(List<String> scopes) _requestScopes;
 
   static GoogleSignIn _createGoogleSignIn() {
-    return GoogleSignIn(
-      scopes: const ['email', 'profile', _driveScope],
-    );
+    return GoogleSignIn(scopes: const ['email', 'profile']);
   }
 
   GoogleCloudBackupService({
@@ -80,6 +81,8 @@ class GoogleCloudBackupService implements CloudBackupService {
     Future<DriveUserSession?> Function()? interactiveSignIn,
     Future<DriveUserSession?> Function()? silentSignIn,
     Future<void> Function()? signOutAction,
+    Future<bool> Function(List<String> scopes)? canAccessScopes,
+    Future<bool> Function(List<String> scopes)? requestScopes,
   }) : _googleSignIn = googleSignIn ?? _createGoogleSignIn(),
        _backupService = backupService ?? BackupService(),
        _httpClient = httpClient ?? http.Client(),
@@ -87,6 +90,8 @@ class GoogleCloudBackupService implements CloudBackupService {
     _interactiveSignIn = interactiveSignIn ?? _signInWithGoogle;
     _silentSignIn = silentSignIn ?? _signInSilentlyWithGoogle;
     _signOutAction = signOutAction ?? _signOutFromGoogle;
+    _canAccessScopes = canAccessScopes ?? _googleSignIn.canAccessScopes;
+    _requestScopes = requestScopes ?? _googleSignIn.requestScopes;
   }
 
   @override
@@ -137,11 +142,7 @@ class GoogleCloudBackupService implements CloudBackupService {
 
       final state = _buildAuthState(session.user);
       await _persistAuthState(state);
-      await _persistBackupInfo(
-        _buildSignedInInfo(
-          user: session.user,
-        ),
-      );
+      await _persistBackupInfo(_buildSignedInInfo(user: session.user));
       return state;
     } on SocketException {
       throw const CloudBackupException('İnternet bağlantısı bulunamadı');
@@ -154,7 +155,7 @@ class GoogleCloudBackupService implements CloudBackupService {
       );
       final state = const AuthState(isSignedIn: false, provider: _provider);
       await _persistAuthState(state);
-      return state;
+      throw CloudBackupException(_describeSignInError(error));
     }
   }
 
@@ -231,10 +232,7 @@ class GoogleCloudBackupService implements CloudBackupService {
     await _persistAuthState(_buildAuthState(session.user));
     await _persistBackupInfo(info);
 
-    return CloudRestoreData(
-      rawJson: response.body,
-      info: info,
-    );
+    return CloudRestoreData(rawJson: response.body, info: info);
   }
 
   @override
@@ -331,6 +329,7 @@ class GoogleCloudBackupService implements CloudBackupService {
         _cachedBackupInfo = baseInfo;
         return baseInfo;
       }
+      await _ensureDriveScopeGranted();
 
       final backupFile = await _findLatestBackup(
         authHeaders: await _authorizedHeaders(session),
@@ -356,7 +355,9 @@ class GoogleCloudBackupService implements CloudBackupService {
     }
   }
 
-  Future<Map<String, String>> _authorizedHeaders(DriveUserSession session) async {
+  Future<Map<String, String>> _authorizedHeaders(
+    DriveUserSession session,
+  ) async {
     try {
       return await session.authHeaders;
     } on SocketException {
@@ -378,6 +379,7 @@ class GoogleCloudBackupService implements CloudBackupService {
       if (session == null) {
         throw const CloudBackupException('Google hesabı ile giriş yapın');
       }
+      await _ensureDriveScopeGranted();
 
       return session;
     } on CloudBackupException {
@@ -393,6 +395,53 @@ class GoogleCloudBackupService implements CloudBackupService {
       );
       throw const CloudBackupException('Google hesabı ile tekrar giriş yapın');
     }
+  }
+
+  Future<void> _ensureDriveScopeGranted() async {
+    try {
+      final hasDriveScope = await _canAccessScopes(const [_driveScope]);
+      if (hasDriveScope) {
+        return;
+      }
+
+      final granted = await _requestScopes(const [_driveScope]);
+      if (!granted) {
+        throw const CloudBackupException(
+          'Google Drive yedekleme izni verilmedi',
+        );
+      }
+    } on CloudBackupException {
+      rethrow;
+    } on SocketException {
+      throw const CloudBackupException('İnternet bağlantısı bulunamadı');
+    } catch (error, stackTrace) {
+      developer.log(
+        'Failed to acquire Drive AppData scope',
+        name: 'GoogleCloudBackupService',
+        error: error,
+        stackTrace: stackTrace,
+      );
+      throw CloudBackupException(
+        'Google Drive izni alınamadı: ${_describeSignInError(error)}',
+      );
+    }
+  }
+
+  String _describeSignInError(Object error) {
+    if (error is PlatformException) {
+      final code = error.code.trim();
+      final message = (error.message ?? '').trim();
+      final details = error.details?.toString().trim() ?? '';
+      final parts = <String>[
+        if (code.isNotEmpty) 'code=$code',
+        if (message.isNotEmpty) message,
+        if (details.isNotEmpty) details,
+      ];
+      if (parts.isNotEmpty) {
+        return 'Google ile giriş başarısız oldu (${parts.join(' | ')})';
+      }
+    }
+    return 'Google ile giriş başarısız oldu (${error.toString()})';
   }
 
   AuthState _buildAuthState(UserAccount user) {
@@ -519,14 +568,17 @@ class GoogleCloudBackupService implements CloudBackupService {
       '--$boundary--',
     );
 
-    final uri = Uri.parse(existingFileId == null
-        ? _driveUploadEndpoint
-        : '$_driveUploadEndpoint/$existingFileId').replace(
-      queryParameters: const <String, String>{
-        'uploadType': 'multipart',
-        'fields': 'id,name,modifiedTime,size',
-      },
-    );
+    final uri =
+        Uri.parse(
+          existingFileId == null
+              ? _driveUploadEndpoint
+              : '$_driveUploadEndpoint/$existingFileId',
+        ).replace(
+          queryParameters: const <String, String>{
+            'uploadType': 'multipart',
+            'fields': 'id,name,modifiedTime,size',
+          },
+        );
 
     final response = await _sendAuthorizedRequest(
       method: existingFileId == null ? 'POST' : 'PATCH',
@@ -627,11 +679,7 @@ class _DriveBackupFile {
   final DateTime? modifiedTime;
   final int? sizeBytes;
 
-  const _DriveBackupFile({
-    required this.id,
-    this.modifiedTime,
-    this.sizeBytes,
-  });
+  const _DriveBackupFile({required this.id, this.modifiedTime, this.sizeBytes});
 
   factory _DriveBackupFile.fromJson(Map<String, dynamic> json) {
     return _DriveBackupFile(

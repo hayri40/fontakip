@@ -222,7 +222,9 @@ class _SettingsScreenState extends State<SettingsScreen> {
     if (_cloudBackupInfo.lastUpdatedAt == null) {
       return _cloudBackupInfo.hasBackup ? 'Bilinmiyor' : 'Henüz yedek yok';
     }
-    return DateFormat('dd.MM.yyyy HH:mm').format(_cloudBackupInfo.lastUpdatedAt!);
+    return DateFormat(
+      'dd.MM.yyyy HH:mm',
+    ).format(_cloudBackupInfo.lastUpdatedAt!);
   }
 
   String _formatCloudBackupSize() {
@@ -233,7 +235,9 @@ class _SettingsScreenState extends State<SettingsScreen> {
     return _updateDownloadService.formatFileSize(size);
   }
 
-  Future<bool> _showCloudRestoreConfirmation(CloudRestoreData restoreData) async {
+  Future<bool> _showCloudRestoreConfirmation(
+    CloudRestoreData restoreData,
+  ) async {
     final lastBackupText = restoreData.info.lastUpdatedAt == null
         ? 'Bilinmiyor'
         : DateFormat(
@@ -241,7 +245,9 @@ class _SettingsScreenState extends State<SettingsScreen> {
           ).format(restoreData.info.lastUpdatedAt!);
     final backupSizeText = restoreData.info.backupSizeBytes == null
         ? 'Bilinmiyor'
-        : _updateDownloadService.formatFileSize(restoreData.info.backupSizeBytes!);
+        : _updateDownloadService.formatFileSize(
+            restoreData.info.backupSizeBytes!,
+          );
     final result = await showDialog<bool>(
       context: context,
       builder: (dialogContext) {
@@ -250,9 +256,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
           content: SingleChildScrollView(
             child: ListBody(
               children: [
-                const Text(
-                  'Bu işlem mevcut verilerin üzerine yazacaktır.',
-                ),
+                const Text('Bu işlem mevcut verilerin üzerine yazacaktır.'),
                 const SizedBox(height: 12),
                 Text('Son Yedekleme: $lastBackupText'),
                 const SizedBox(height: 4),
@@ -291,21 +295,28 @@ class _SettingsScreenState extends State<SettingsScreen> {
 
     try {
       final nextState = await _cloudBackupService.signIn();
-      final nextBackupInfo = await _cloudBackupService.getBackupInfo();
       if (!mounted) {
         return;
       }
 
       setState(() {
         _cloudAuthState = nextState;
-        _cloudBackupInfo = nextBackupInfo;
       });
 
       if (!nextState.isSignedIn) {
         ScaffoldMessenger.of(context).showSnackBar(
           const SnackBar(content: Text('Google ile giriş başarısız oldu.')),
         );
+        return;
       }
+
+      final nextBackupInfo = await _cloudBackupService.getBackupInfo();
+      if (!mounted) {
+        return;
+      }
+      setState(() {
+        _cloudBackupInfo = nextBackupInfo;
+      });
     } on CloudBackupException catch (e) {
       if (!mounted) {
         return;
@@ -440,9 +451,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
         return;
       }
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
-          content: Text('⚠️ Bulut yedeği geçersiz veya bozuk'),
-        ),
+        const SnackBar(content: Text('⚠️ Bulut yedeği geçersiz veya bozuk')),
       );
     } catch (_) {
       if (!mounted) {
@@ -1062,11 +1071,15 @@ class _SettingsScreenState extends State<SettingsScreen> {
                     'Durum: ${_cloudAuthState.isSignedIn ? 'Bağlı' : 'Bağlı Değil'}',
                   ),
                   const SizedBox(height: 8),
-                  if ((_cloudBackupInfo.user ?? _cloudAuthState.user)?.displayName != null)
+                  if ((_cloudBackupInfo.user ?? _cloudAuthState.user)
+                          ?.displayName !=
+                      null)
                     Text(
                       'Ad: ${(_cloudBackupInfo.user ?? _cloudAuthState.user)!.displayName}',
                     ),
-                  if ((_cloudBackupInfo.user ?? _cloudAuthState.user)?.displayName != null)
+                  if ((_cloudBackupInfo.user ?? _cloudAuthState.user)
+                          ?.displayName !=
+                      null)
                     const SizedBox(height: 4),
                   Text(
                     'Google Hesabı: ${_cloudBackupInfo.user?.email ?? _cloudAuthState.user?.email ?? 'Giriş yapılmadı'}',

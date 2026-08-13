@@ -9,9 +9,7 @@ import 'package:http/testing.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
 class _FakeBackupService extends BackupService {
-  _FakeBackupService({
-    required this.exportJson,
-  });
+  _FakeBackupService({required this.exportJson});
 
   final String exportJson;
   String? importedJson;
@@ -81,6 +79,8 @@ void main() {
       }),
       interactiveSignIn: () async => buildSession(),
       silentSignIn: () async => buildSession(),
+      canAccessScopes: (_) async => true,
+      requestScopes: (_) async => true,
     );
 
     final info = await service.uploadBackup();
@@ -117,6 +117,8 @@ void main() {
       }),
       interactiveSignIn: () async => buildSession(),
       silentSignIn: () async => buildSession(),
+      canAccessScopes: (_) async => true,
+      requestScopes: (_) async => true,
     );
 
     final restoreData = await service.downloadBackup();
@@ -134,6 +136,8 @@ void main() {
       httpClient: MockClient((request) async => http.Response('{}', 200)),
       interactiveSignIn: () async => buildSession(),
       silentSignIn: () async => buildSession(),
+      canAccessScopes: (_) async => true,
+      requestScopes: (_) async => true,
     );
 
     await service.restoreBackupData('{"database":{},"sharedPreferences":{}}');
@@ -141,6 +145,30 @@ void main() {
     expect(
       backupService.importedJson,
       '{"database":{},"sharedPreferences":{}}',
+    );
+  });
+
+  test('signIn surfaces real exception message', () async {
+    final service = GoogleCloudBackupService(
+      backupService: _FakeBackupService(exportJson: '{}'),
+      httpClient: MockClient((request) async => http.Response('{}', 200)),
+      interactiveSignIn: () async {
+        throw Exception('drive scope consent failed');
+      },
+      silentSignIn: () async => null,
+      canAccessScopes: (_) async => true,
+      requestScopes: (_) async => true,
+    );
+
+    await expectLater(
+      service.signIn(),
+      throwsA(
+        isA<CloudBackupException>().having(
+          (e) => e.message,
+          'message',
+          contains('drive scope consent failed'),
+        ),
+      ),
     );
   });
 }

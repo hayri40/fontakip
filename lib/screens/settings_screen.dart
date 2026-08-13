@@ -9,6 +9,7 @@ import 'package:shared_preferences/shared_preferences.dart';
 import 'data_sources_screen.dart';
 import 'update_notes_screen.dart';
 import '../models/auth_state.dart';
+import '../models/cloud_backup_info.dart';
 import '../models/version_info.dart';
 import '../services/backup_service.dart';
 import '../services/cloud_backup_service.dart';
@@ -58,6 +59,10 @@ class _SettingsScreenState extends State<SettingsScreen> {
     isSignedIn: false,
     provider: 'google',
   );
+  CloudBackupInfo _cloudBackupInfo = const CloudBackupInfo(
+    provider: 'google',
+    isSignedIn: false,
+  );
 
   @override
   void initState() {
@@ -76,6 +81,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
     final timestampValue = prefs.getString(_lastCheckKey);
     final lastVersionValue = prefs.getString(_lastVersionKey);
     final cloudAuthState = await _cloudBackupService.getAuthState();
+    final cloudBackupInfo = await _cloudBackupService.getBackupInfo();
 
     if (!mounted) {
       return;
@@ -101,6 +107,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
       }
       _updateAvailable = prefs.getBool(_lastUpdateAvailableKey) ?? false;
       _cloudAuthState = cloudAuthState;
+      _cloudBackupInfo = cloudBackupInfo;
     });
   }
 
@@ -211,57 +218,248 @@ class _SettingsScreenState extends State<SettingsScreen> {
     return DateFormat('dd.MM.yyyy HH:mm').format(_lastCheckTime!);
   }
 
-  Future<void> _handleGoogleSignIn() async {
-    await _cloudBackupService.signIn();
-    final nextState = await _cloudBackupService.getAuthState();
-    if (!mounted) {
-      return;
+  String _formatCloudBackupDate() {
+    if (_cloudBackupInfo.lastUpdatedAt == null) {
+      return _cloudBackupInfo.hasBackup ? 'Bilinmiyor' : 'Henüz yedek yok';
     }
+    return DateFormat('dd.MM.yyyy HH:mm').format(_cloudBackupInfo.lastUpdatedAt!);
+  }
+
+  String _formatCloudBackupSize() {
+    final size = _cloudBackupInfo.backupSizeBytes;
+    if (size == null) {
+      return _cloudBackupInfo.hasBackup ? 'Bilinmiyor' : 'Henüz yedek yok';
+    }
+    return _updateDownloadService.formatFileSize(size);
+  }
+
+  Future<bool> _showCloudRestoreConfirmation(CloudRestoreData restoreData) async {
+    final lastBackupText = restoreData.info.lastUpdatedAt == null
+        ? 'Bilinmiyor'
+        : DateFormat(
+            'dd.MM.yyyy HH:mm',
+          ).format(restoreData.info.lastUpdatedAt!);
+    final backupSizeText = restoreData.info.backupSizeBytes == null
+        ? 'Bilinmiyor'
+        : _updateDownloadService.formatFileSize(restoreData.info.backupSizeBytes!);
+    final result = await showDialog<bool>(
+      context: context,
+      builder: (dialogContext) {
+        return AlertDialog(
+          title: const Text('Buluttan Geri Yükle'),
+          content: SingleChildScrollView(
+            child: ListBody(
+              children: [
+                const Text(
+                  'Bu işlem mevcut verilerin üzerine yazacaktır.',
+                ),
+                const SizedBox(height: 12),
+                Text('Son Yedekleme: $lastBackupText'),
+                const SizedBox(height: 4),
+                Text('Yedek Boyutu: $backupSizeText'),
+                const SizedBox(height: 12),
+                const Text(
+                  'Devam etmek istiyor musunuz?',
+                  style: TextStyle(fontWeight: FontWeight.w500),
+                ),
+              ],
+            ),
+          ),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.pop(dialogContext, false),
+              child: const Text('İptal'),
+            ),
+            FilledButton(
+              onPressed: () => Navigator.pop(dialogContext, true),
+              child: const Text('Geri Yükle'),
+            ),
+          ],
+        );
+      },
+    );
+
+    return result == true;
+  }
+
+  Future<void> _handleGoogleSignIn() async {
+    if (_busy) return;
 
     setState(() {
-      _cloudAuthState = nextState;
+      _busy = true;
     });
 
-    if (!_cloudAuthState.isSignedIn) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Google ile giriş başarısız oldu.')),
-      );
+    try {
+      final nextState = await _cloudBackupService.signIn();
+      final nextBackupInfo = await _cloudBackupService.getBackupInfo();
+      if (!mounted) {
+        return;
+      }
+
+      setState(() {
+        _cloudAuthState = nextState;
+        _cloudBackupInfo = nextBackupInfo;
+      });
+
+      if (!nextState.isSignedIn) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('Google ile giriş başarısız oldu.')),
+        );
+      }
+    } on CloudBackupException catch (e) {
+      if (!mounted) {
+        return;
+      }
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(SnackBar(content: Text('⚠️ ${e.message}')));
+    } finally {
+      if (mounted) {
+        setState(() {
+          _busy = false;
+        });
+      }
     }
   }
 
   Future<void> _handleCloudSignOut() async {
-    await _cloudBackupService.signOut();
-    final nextState = await _cloudBackupService.getAuthState();
-    if (!mounted) {
-      return;
-    }
+    if (_busy) return;
+
     setState(() {
-      _cloudAuthState = nextState;
+      _busy = true;
     });
+
+    try {
+      await _cloudBackupService.signOut();
+      final nextState = await _cloudBackupService.getAuthState();
+      if (!mounted) {
+        return;
+      }
+      setState(() {
+        _cloudAuthState = nextState;
+        _cloudBackupInfo = const CloudBackupInfo(
+          provider: 'google',
+          isSignedIn: false,
+        );
+      });
+    } finally {
+      if (mounted) {
+        setState(() {
+          _busy = false;
+        });
+      }
+    }
   }
 
   Future<void> _handleCloudUpload() async {
-    await _cloudBackupService.uploadBackup();
-    if (!mounted) {
-      return;
+    if (_busy) return;
+
+    setState(() {
+      _busy = true;
+    });
+
+    try {
+      final nextBackupInfo = await _cloudBackupService.uploadBackup();
+      final nextState = await _cloudBackupService.getAuthState();
+      if (!mounted) {
+        return;
+      }
+
+      setState(() {
+        _cloudAuthState = nextState;
+        _cloudBackupInfo = nextBackupInfo;
+      });
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('✅ Bulut yedekleme tamamlandı')),
+      );
+    } on CloudBackupException catch (e) {
+      if (!mounted) {
+        return;
+      }
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(SnackBar(content: Text('⚠️ ${e.message}')));
+    } catch (_) {
+      if (!mounted) {
+        return;
+      }
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('⚠️ Bulut yedekleme sırasında bir hata oluştu'),
+        ),
+      );
+    } finally {
+      if (mounted) {
+        setState(() {
+          _busy = false;
+        });
+      }
     }
-    ScaffoldMessenger.of(context).showSnackBar(
-      const SnackBar(
-        content: Text('Bulut yedekleme özelliği yakında aktif olacak.'),
-      ),
-    );
   }
 
   Future<void> _handleCloudRestore() async {
-    await _cloudBackupService.restoreBackup();
-    if (!mounted) {
-      return;
+    if (_busy) return;
+
+    setState(() {
+      _busy = true;
+    });
+
+    try {
+      final restoreData = await _cloudBackupService.downloadBackup();
+      if (!mounted) {
+        return;
+      }
+
+      final confirmed = await _showCloudRestoreConfirmation(restoreData);
+      if (!confirmed) {
+        return;
+      }
+
+      await _cloudBackupService.restoreBackupData(restoreData.rawJson);
+      if (!mounted) {
+        return;
+      }
+
+      setState(() {
+        _cloudBackupInfo = restoreData.info;
+      });
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('✅ Yedek başarıyla geri yüklendi')),
+      );
+      await Future<void>.delayed(const Duration(milliseconds: 800));
+      await SystemNavigator.pop();
+    } on CloudBackupException catch (e) {
+      if (!mounted) {
+        return;
+      }
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(SnackBar(content: Text('⚠️ ${e.message}')));
+    } on FormatException {
+      if (!mounted) {
+        return;
+      }
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('⚠️ Bulut yedeği geçersiz veya bozuk'),
+        ),
+      );
+    } catch (_) {
+      if (!mounted) {
+        return;
+      }
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('⚠️ Bulut yedeği geri yüklenirken bir hata oluştu'),
+        ),
+      );
+    } finally {
+      if (mounted) {
+        setState(() {
+          _busy = false;
+        });
+      }
     }
-    ScaffoldMessenger.of(context).showSnackBar(
-      const SnackBar(
-        content: Text('Buluttan geri yükleme yakında aktif olacak.'),
-      ),
-    );
   }
 
   String _formatDownloadProgress() {
@@ -863,13 +1061,26 @@ class _SettingsScreenState extends State<SettingsScreen> {
                   Text(
                     'Durum: ${_cloudAuthState.isSignedIn ? 'Bağlı' : 'Bağlı Değil'}',
                   ),
+                  const SizedBox(height: 8),
+                  if ((_cloudBackupInfo.user ?? _cloudAuthState.user)?.displayName != null)
+                    Text(
+                      'Ad: ${(_cloudBackupInfo.user ?? _cloudAuthState.user)!.displayName}',
+                    ),
+                  if ((_cloudBackupInfo.user ?? _cloudAuthState.user)?.displayName != null)
+                    const SizedBox(height: 4),
+                  Text(
+                    'Google Hesabı: ${_cloudBackupInfo.user?.email ?? _cloudAuthState.user?.email ?? 'Giriş yapılmadı'}',
+                  ),
+                  const SizedBox(height: 4),
+                  Text('Son Yedekleme: ${_formatCloudBackupDate()}'),
+                  const SizedBox(height: 4),
+                  Text('Yedek Boyutu: ${_formatCloudBackupSize()}'),
                   if (_cloudAuthState.isSignedIn) ...[
                     const SizedBox(height: 8),
-                    if (_cloudAuthState.user?.displayName != null)
-                      Text('Ad: ${_cloudAuthState.user!.displayName}'),
-                    const SizedBox(height: 4),
                     Text(
-                      'Hesap: ${_cloudAuthState.user?.email ?? 'Bilinmeyen kullanıcı'}',
+                      _cloudBackupInfo.hasBackup
+                          ? 'Bulutta kayıtlı yedek bulundu'
+                          : 'Bulutta kayıtlı yedek bulunamadı',
                     ),
                   ],
                   const SizedBox(height: 16),
@@ -879,17 +1090,17 @@ class _SettingsScreenState extends State<SettingsScreen> {
                       runSpacing: 8,
                       children: [
                         FilledButton.icon(
-                          onPressed: _handleCloudUpload,
+                          onPressed: _busy ? null : _handleCloudUpload,
                           icon: const Icon(Icons.upload),
                           label: const Text('Buluta Yedekle'),
                         ),
                         FilledButton.icon(
-                          onPressed: _handleCloudRestore,
+                          onPressed: _busy ? null : _handleCloudRestore,
                           icon: const Icon(Icons.download),
                           label: const Text('Buluttan Geri Yükle'),
                         ),
                         OutlinedButton.icon(
-                          onPressed: _handleCloudSignOut,
+                          onPressed: _busy ? null : _handleCloudSignOut,
                           icon: const Icon(Icons.logout),
                           label: const Text('Çıkış Yap'),
                         ),
@@ -899,7 +1110,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
                     SizedBox(
                       width: double.infinity,
                       child: FilledButton.icon(
-                        onPressed: _handleGoogleSignIn,
+                        onPressed: _busy ? null : _handleGoogleSignIn,
                         icon: const Icon(Icons.login),
                         label: const Text('Google ile Giriş Yap'),
                       ),

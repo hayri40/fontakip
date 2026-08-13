@@ -1,8 +1,9 @@
 import 'dart:convert';
 import 'dart:io';
+
+import 'package:file_picker/file_picker.dart';
 import 'package:path_provider/path_provider.dart';
 import 'package:share_plus/share_plus.dart';
-import 'package:file_picker/file_picker.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:sqflite/sqflite.dart';
 
@@ -19,7 +20,7 @@ class BackupService {
     'stock_favorites',
   ];
 
-  Future<String?> exportBackup() async {
+  Future<Map<String, dynamic>> createBackupPayload() async {
     final db = await TransactionDatabase.instance.database;
     final prefs = await SharedPreferences.getInstance();
 
@@ -33,15 +34,26 @@ class BackupService {
       sharedPrefsData[key] = prefs.get(key);
     }
 
-    final tempDir = await getTemporaryDirectory();
-    final selectedPath = '${tempDir.path}/$defaultFileName';
-    final payload = <String, dynamic>{
+    return <String, dynamic>{
       'version': 1,
       'createdAt': DateTime.now().toIso8601String(),
       'database': dbData,
       'sharedPreferences': sharedPrefsData,
     };
-    final jsonContent = const JsonEncoder.withIndent('  ').convert(payload);
+  }
+
+  Future<String> createBackupJson({bool pretty = false}) async {
+    final payload = await createBackupPayload();
+    final encoder = pretty
+        ? const JsonEncoder.withIndent('  ')
+        : const JsonEncoder();
+    return encoder.convert(payload);
+  }
+
+  Future<String?> exportBackup() async {
+    final tempDir = await getTemporaryDirectory();
+    final selectedPath = '${tempDir.path}/$defaultFileName';
+    final jsonContent = await createBackupJson(pretty: true);
     final file = File(selectedPath);
 
     await file.writeAsString(jsonContent);
@@ -72,11 +84,20 @@ class BackupService {
 
     final file = File(selectedPath);
     final raw = await file.readAsString();
+    await importBackupFromJson(raw);
+    return true;
+  }
+
+  Future<void> importBackupFromJson(String raw) async {
     final decoded = jsonDecode(raw);
     if (decoded is! Map<String, dynamic>) {
       throw const FormatException('Geçersiz yedek dosyası');
     }
 
+    await importBackupPayload(decoded);
+  }
+
+  Future<void> importBackupPayload(Map<String, dynamic> decoded) async {
     final databaseData = decoded['database'];
     final prefsData = decoded['sharedPreferences'];
     if (databaseData is! Map<String, dynamic> || prefsData is! Map<String, dynamic>) {
@@ -86,7 +107,6 @@ class BackupService {
     final db = await TransactionDatabase.instance.database;
     await _restoreDatabase(db, databaseData);
     await _restoreSharedPreferences(prefsData);
-    return true;
   }
 
   Future<void> resetAllUserData() async {

@@ -10,9 +10,11 @@ import 'data_sources_screen.dart';
 import 'update_notes_screen.dart';
 import '../models/auth_state.dart';
 import '../models/cloud_backup_info.dart';
+import '../models/email_summary_preferences.dart';
 import '../models/version_info.dart';
 import '../services/backup_service.dart';
 import '../services/cloud_backup_service.dart';
+import '../services/email_summary_preferences_service.dart';
 import '../services/update_service.dart';
 import '../services/update_download_service.dart';
 
@@ -20,12 +22,14 @@ class SettingsScreen extends StatefulWidget {
   final BackupService? backupService;
   final UpdateService? updateService;
   final CloudBackupService? cloudBackupService;
+  final EmailSummaryPreferencesService? emailSummaryPreferencesService;
 
   const SettingsScreen({
     super.key,
     this.backupService,
     this.updateService,
     this.cloudBackupService,
+    this.emailSummaryPreferencesService,
   });
 
   @override
@@ -41,8 +45,11 @@ class _SettingsScreenState extends State<SettingsScreen> {
   late final BackupService _backupService;
   late final UpdateService _updateService;
   late final CloudBackupService _cloudBackupService;
+  late final EmailSummaryPreferencesService _emailSummaryPreferencesService;
   late final UpdateDownloadService _updateDownloadService;
   bool _busy = false;
+  bool _emailPreferencesBusy = false;
+  bool _emailPreferencesLoaded = false;
   bool _checkingUpdates = false;
   bool _downloadingUpdate = false;
   int _downloadProgress = 0;
@@ -63,6 +70,8 @@ class _SettingsScreenState extends State<SettingsScreen> {
     provider: 'google',
     isSignedIn: false,
   );
+  EmailSummaryPreferences _emailSummaryPreferences =
+      const EmailSummaryPreferences();
 
   @override
   void initState() {
@@ -71,6 +80,9 @@ class _SettingsScreenState extends State<SettingsScreen> {
     _updateService = widget.updateService ?? const UpdateService();
     _cloudBackupService =
         widget.cloudBackupService ?? GoogleCloudBackupService();
+    _emailSummaryPreferencesService =
+        widget.emailSummaryPreferencesService ??
+        SharedPreferencesEmailSummaryPreferencesService();
     _updateDownloadService = UpdateDownloadService();
     _loadInitialState();
   }
@@ -82,6 +94,8 @@ class _SettingsScreenState extends State<SettingsScreen> {
     final lastVersionValue = prefs.getString(_lastVersionKey);
     final cloudAuthState = await _cloudBackupService.getAuthState();
     final cloudBackupInfo = await _cloudBackupService.getBackupInfo();
+    final emailSummaryPreferences = await _emailSummaryPreferencesService
+        .load();
 
     if (!mounted) {
       return;
@@ -108,6 +122,8 @@ class _SettingsScreenState extends State<SettingsScreen> {
       _updateAvailable = prefs.getBool(_lastUpdateAvailableKey) ?? false;
       _cloudAuthState = cloudAuthState;
       _cloudBackupInfo = cloudBackupInfo;
+      _emailSummaryPreferences = emailSummaryPreferences;
+      _emailPreferencesLoaded = true;
     });
   }
 
@@ -235,6 +251,82 @@ class _SettingsScreenState extends State<SettingsScreen> {
     return _updateDownloadService.formatFileSize(size);
   }
 
+  String _formatEmailSummaryDate(DateTime? value) {
+    if (value == null) {
+      return 'Henüz gönderilmedi';
+    }
+    return DateFormat('dd.MM.yyyy HH:mm').format(value);
+  }
+
+  Future<void> _saveEmailSummaryPreferences(
+    EmailSummaryPreferences nextPreferences,
+  ) async {
+    setState(() {
+      _emailPreferencesBusy = true;
+    });
+
+    try {
+      final saved = await _emailSummaryPreferencesService.save(nextPreferences);
+      if (!mounted) {
+        return;
+      }
+      setState(() {
+        _emailSummaryPreferences = saved;
+      });
+    } catch (error) {
+      if (!mounted) {
+        return;
+      }
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text('⚠️ E-posta bildirim ayarları kaydedilemedi: $error'),
+        ),
+      );
+    } finally {
+      if (mounted) {
+        setState(() {
+          _emailPreferencesBusy = false;
+        });
+      }
+    }
+  }
+
+  Future<void> _pickEmailSummaryTime({required bool isFundSummary}) async {
+    final currentValue = isFundSummary
+        ? _emailSummaryPreferences.fundSummaryTime
+        : _emailSummaryPreferences.stockSummaryTime;
+    final initialTime = _parseTimeOfDay(currentValue);
+    final selected = await showTimePicker(
+      context: context,
+      initialTime: initialTime,
+    );
+    if (selected == null || !mounted) {
+      return;
+    }
+
+    final formatted =
+        '${selected.hour.toString().padLeft(2, '0')}:${selected.minute.toString().padLeft(2, '0')}';
+    final nextPreferences = isFundSummary
+        ? _emailSummaryPreferences.copyWith(fundSummaryTime: formatted)
+        : _emailSummaryPreferences.copyWith(stockSummaryTime: formatted);
+    await _saveEmailSummaryPreferences(nextPreferences);
+  }
+
+  TimeOfDay _parseTimeOfDay(String value) {
+    final match = RegExp(r'^(\d{1,2}):(\d{2})$').firstMatch(value.trim());
+    if (match == null) {
+      return const TimeOfDay(hour: 9, minute: 30);
+    }
+
+    final hour = int.tryParse(match.group(1) ?? '');
+    final minute = int.tryParse(match.group(2) ?? '');
+    if (hour == null || minute == null) {
+      return const TimeOfDay(hour: 9, minute: 30);
+    }
+
+    return TimeOfDay(hour: hour.clamp(0, 23), minute: minute.clamp(0, 59));
+  }
+
   Future<bool> _showCloudRestoreConfirmation(
     CloudRestoreData restoreData,
   ) async {
@@ -360,6 +452,177 @@ class _SettingsScreenState extends State<SettingsScreen> {
         });
       }
     }
+  }
+
+  Widget _buildEmailNotificationTile({
+    required IconData icon,
+    required String title,
+    required bool enabled,
+    required String timeText,
+    required DateTime? lastSentAt,
+    required ValueChanged<bool> onChanged,
+    required VoidCallback onTimePressed,
+    required String helperText,
+  }) {
+    return Container(
+      width: double.infinity,
+      padding: const EdgeInsets.all(12),
+      decoration: BoxDecoration(
+        border: Border.all(color: Colors.grey.shade300),
+        borderRadius: BorderRadius.circular(12),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Padding(
+                padding: const EdgeInsets.only(top: 4),
+                child: Icon(icon, size: 20),
+              ),
+              const SizedBox(width: 12),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      title,
+                      style: const TextStyle(
+                        fontWeight: FontWeight.w600,
+                        fontSize: 15,
+                      ),
+                    ),
+                    const SizedBox(height: 4),
+                    Text(
+                      helperText,
+                      style: const TextStyle(fontSize: 12, color: Colors.grey),
+                    ),
+                  ],
+                ),
+              ),
+              Switch.adaptive(value: enabled, onChanged: onChanged),
+            ],
+          ),
+          const SizedBox(height: 12),
+          Wrap(
+            spacing: 8,
+            runSpacing: 8,
+            crossAxisAlignment: WrapCrossAlignment.center,
+            children: [
+              OutlinedButton.icon(
+                onPressed: onTimePressed,
+                icon: const Icon(Icons.schedule),
+                label: Text('Saat: $timeText'),
+              ),
+              Text(
+                'Son Gönderim: ${_formatEmailSummaryDate(lastSentAt)}',
+                style: const TextStyle(fontSize: 12, color: Colors.grey),
+              ),
+            ],
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildEmailNotificationsCard() {
+    final recipientEmail =
+        _cloudAuthState.user?.email ?? _cloudBackupInfo.user?.email;
+    final isGoogleRequired = !_cloudAuthState.isSignedIn;
+    final isDisabled =
+        isGoogleRequired ||
+        _busy ||
+        _emailPreferencesBusy ||
+        !_emailPreferencesLoaded;
+
+    return Card(
+      child: Padding(
+        padding: const EdgeInsets.all(16),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Row(
+              children: [
+                const Icon(Icons.mark_email_unread_outlined),
+                const SizedBox(width: 12),
+                const Text(
+                  '🔔 E-Posta Bildirimleri',
+                  style: TextStyle(fontSize: 18, fontWeight: FontWeight.w600),
+                ),
+                if (_emailPreferencesBusy) ...[
+                  const SizedBox(width: 12),
+                  const SizedBox(
+                    width: 16,
+                    height: 16,
+                    child: CircularProgressIndicator(strokeWidth: 2),
+                  ),
+                ],
+              ],
+            ),
+            const SizedBox(height: 12),
+            Text(
+              'Gönderilecek Adres: ${recipientEmail ?? 'Google hesabı gerekli'}',
+            ),
+            const SizedBox(height: 4),
+            Text(
+              isGoogleRequired
+                  ? 'Bu özellik için Google hesabı gereklidir.'
+                  : 'Mail gönderimleri FontTakip sistem hesabı üzerinden yapılır.',
+              style: TextStyle(
+                color: isGoogleRequired ? Colors.orange : Colors.grey,
+              ),
+            ),
+            const SizedBox(height: 16),
+            IgnorePointer(
+              ignoring: isDisabled,
+              child: Opacity(
+                opacity: isDisabled ? 0.6 : 1,
+                child: Column(
+                  children: [
+                    _buildEmailNotificationTile(
+                      icon: Icons.stacked_line_chart,
+                      title: 'Günlük Fon Özeti Gönder',
+                      enabled: _emailSummaryPreferences.fundSummaryEnabled,
+                      timeText: _emailSummaryPreferences.fundSummaryTime,
+                      lastSentAt:
+                          _emailSummaryPreferences.lastFundSummarySentAt,
+                      onChanged: (value) => _saveEmailSummaryPreferences(
+                        _emailSummaryPreferences.copyWith(
+                          fundSummaryEnabled: value,
+                        ),
+                      ),
+                      onTimePressed: () =>
+                          _pickEmailSummaryTime(isFundSummary: true),
+                      helperText:
+                          'Fon portföyü yoksa 09:30 özeti otomatik atlanır.',
+                    ),
+                    const SizedBox(height: 12),
+                    _buildEmailNotificationTile(
+                      icon: Icons.query_stats,
+                      title: 'Günlük Hisse Özeti Gönder',
+                      enabled: _emailSummaryPreferences.stockSummaryEnabled,
+                      timeText: _emailSummaryPreferences.stockSummaryTime,
+                      lastSentAt:
+                          _emailSummaryPreferences.lastStockSummarySentAt,
+                      onChanged: (value) => _saveEmailSummaryPreferences(
+                        _emailSummaryPreferences.copyWith(
+                          stockSummaryEnabled: value,
+                        ),
+                      ),
+                      onTimePressed: () =>
+                          _pickEmailSummaryTime(isFundSummary: false),
+                      helperText:
+                          'Hisse portföyü yoksa 18:30 özeti otomatik atlanır.',
+                    ),
+                  ],
+                ),
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
   }
 
   Future<void> _handleCloudUpload() async {
@@ -1046,6 +1309,8 @@ class _SettingsScreenState extends State<SettingsScreen> {
               ),
             ),
           ),
+          const SizedBox(height: 16),
+          _buildEmailNotificationsCard(),
           const SizedBox(height: 16),
           Card(
             child: Padding(

@@ -1,8 +1,8 @@
 {
-  "version": "1.0.8",
-  "releaseDate": "2026-08-14",
+  "version": "1.1.0",
+  "releaseDate": "2026-08-15",
   "notes": [
     "Otomatik olarak GitHub Actions tarafından oluşturulan release"
   ],
-  "apkUrl": "https://github.com/hayri40/fontakip/releases/download/v1.0.8/fontakip-1.0.8.apk"
+  "apkUrl": "https://github.com/hayri40/fontakip/releases/download/v1.1.0/fontakip-1.1.0.apk"
 }

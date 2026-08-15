@@ -234,55 +234,56 @@ class _StockPortfolioScreenState extends State<StockPortfolioScreen> {
                                   borderRadius: BorderRadius.circular(8),
                                 ),
                                 child: Column(
-                              crossAxisAlignment: CrossAxisAlignment.center,
-                              children: [
-                                const Text(
-                                  'Günlük',
-                                  style: TextStyle(
-                                    fontSize: 9,
-                                    color: Colors.grey,
-                                    fontWeight: FontWeight.w600,
-                                  ),
-                                ),
-                                const SizedBox(height: 2),
-                                Row(
-                                  mainAxisAlignment: MainAxisAlignment.center,
+                                  crossAxisAlignment: CrossAxisAlignment.center,
                                   children: [
-                                  Text(
-                                      dailyArrow,
+                                    const Text(
+                                      'Günlük',
                                       style: TextStyle(
-                                        color: dailyColor,
-                                        fontWeight: FontWeight.bold,
-                                        fontSize: 11,
+                                        fontSize: 9,
+                                        color: Colors.grey,
+                                        fontWeight: FontWeight.w600,
                                       ),
                                     ),
-                                    const SizedBox(width: 4),
+                                    const SizedBox(height: 2),
+                                    Row(
+                                      mainAxisAlignment: MainAxisAlignment.center,
+                                      children: [
+                                        Text(
+                                          dailyArrow,
+                                          style: TextStyle(
+                                            color: dailyColor,
+                                            fontWeight: FontWeight.bold,
+                                            fontSize: 11,
+                                          ),
+                                        ),
+                                        const SizedBox(width: 4),
+                                        Text(
+                                          AppFormatters.signedPercentValue(
+                                            holding.dailyChangePercent,
+                                          ),
+                                          style: TextStyle(
+                                            color: dailyColor,
+                                            fontWeight: FontWeight.w700,
+                                            fontSize: 11,
+                                          ),
+                                        ),
+                                      ],
+                                    ),
+                                    const SizedBox(height: 2),
                                     Text(
-                                      AppFormatters.signedPercentValue(
-                                        holding.dailyChangePercent,
+                                      AppFormatters.signedCurrencyValue(
+                                        holding.dailyChangeValue,
                                       ),
                                       style: TextStyle(
                                         color: dailyColor,
                                         fontWeight: FontWeight.w700,
-                                        fontSize: 11,
+                                        fontSize: 10,
                                       ),
                                     ),
                                   ],
                                 ),
-                                const SizedBox(height: 2),
-                                Text(
-                                  AppFormatters.signedCurrencyValue(
-                                    holding.dailyChangeValue,
-                                  ),
-                                  style: TextStyle(
-                                    color: dailyColor,
-                                    fontWeight: FontWeight.w700,
-                                    fontSize: 10,
-                                  ),
-                                ),
-                              ],
-                                ),
                               ),
+                            ),
                           ),
                         ),
                         Expanded(

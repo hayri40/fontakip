@@ -7,6 +7,8 @@ class StockHolding {
   final double currentValue;
   final double profitLoss;
   final double profitLossPercent;
+  final double dailyChangePercent;
+  final double dailyChangeValue;
 
   const StockHolding({
     required this.symbol,
@@ -17,5 +19,7 @@ class StockHolding {
     required this.currentValue,
     required this.profitLoss,
     required this.profitLossPercent,
+    this.dailyChangePercent = 0.0,
+    this.dailyChangeValue = 0.0,
   });
 }

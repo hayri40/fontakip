@@ -10,6 +10,8 @@ class Holding {
   final double profitLossPercent;
 
   final double portfolioSharePercent;
+  final double dailyChangePercent;
+  final double dailyChangeValue;
 
   const Holding({
     required this.fundCode,
@@ -23,5 +25,7 @@ class Holding {
     required this.profitLossPercent,
 
     required this.portfolioSharePercent,
+    this.dailyChangePercent = 0.0,
+    this.dailyChangeValue = 0.0,
   });
 }

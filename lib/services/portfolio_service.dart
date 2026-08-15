@@ -14,10 +14,7 @@ class PortfolioService {
     final Map<String, List<Transaction>> grouped = {};
 
     for (final transaction in transactions) {
-      grouped.putIfAbsent(
-        transaction.fundCode,
-            () => [],
-      );
+      grouped.putIfAbsent(transaction.fundCode, () => []);
 
       grouped[transaction.fundCode]!.add(transaction);
     }
@@ -41,33 +38,33 @@ class PortfolioService {
         }
       }
 
-      final netQuantity =
-          totalBuyQuantity - totalSellQuantity;
+      final netQuantity = totalBuyQuantity - totalSellQuantity;
 
       if (netQuantity <= 0) {
         continue;
       }
 
-      final averageCost =
-          totalBuyCost / totalBuyQuantity;
+      final averageCost = totalBuyCost / totalBuyQuantity;
 
-      final costValue =
-          netQuantity * averageCost;
+      final costValue = netQuantity * averageCost;
 
       final fund = await _fonoloji.getFund(fundCode);
 
       final currentPrice = fund.currentPrice;
+      final previousClose = fund.previousClose ?? currentPrice;
 
-      final currentValue =
-          netQuantity * currentPrice;
+      final currentValue = netQuantity * currentPrice;
 
-      final profitLoss =
-          currentValue - costValue;
+      final profitLoss = currentValue - costValue;
 
-      final double profitLossPercent =
-      costValue == 0
+      final double profitLossPercent = costValue == 0
           ? 0.0
           : ((profitLoss / costValue) * 100);
+
+      final dailyChangePercent = previousClose == 0
+          ? 0.0
+          : ((currentPrice - previousClose) / previousClose) * 100;
+      final dailyChangeValue = (currentPrice - previousClose) * netQuantity;
 
       tempHoldings.add(
         Holding(
@@ -82,22 +79,21 @@ class PortfolioService {
           profitLossPercent: profitLossPercent,
 
           portfolioSharePercent: 0,
+          dailyChangePercent: dailyChangePercent,
+          dailyChangeValue: dailyChangeValue,
         ),
       );
     }
 
     final totalPortfolioValue = tempHoldings.fold(
       0.0,
-          (sum, item) => sum + item.currentValue,
+      (sum, item) => sum + item.currentValue,
     );
 
     return tempHoldings.map((holding) {
-      final sharePercent =
-      totalPortfolioValue == 0
+      final sharePercent = totalPortfolioValue == 0
           ? 0.0
-          : (holding.currentValue /
-          totalPortfolioValue) *
-          100;
+          : (holding.currentValue / totalPortfolioValue) * 100;
 
       return Holding(
         fundCode: holding.fundCode,
@@ -111,6 +107,8 @@ class PortfolioService {
         profitLossPercent: holding.profitLossPercent,
 
         portfolioSharePercent: sharePercent,
+        dailyChangePercent: holding.dailyChangePercent,
+        dailyChangeValue: holding.dailyChangeValue,
       );
     }).toList();
   }

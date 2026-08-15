@@ -65,7 +65,7 @@ void main() {
     );
   });
 
-  testWidgets('shows Google requirement message for email notifications', (
+  testWidgets('hides email notification settings from the settings screen', (
     tester,
   ) async {
     await tester.pumpWidget(
@@ -86,26 +86,14 @@ void main() {
 
     await tester.pumpAndSettle();
 
-    expect(find.text('🔔 E-Posta Bildirimleri'), findsOneWidget);
-    expect(
-      find.text('Bu özellik için Google hesabı gereklidir.'),
-      findsOneWidget,
-    );
-    expect(
-      find.text('Gönderilecek Adres: Google hesabı gerekli'),
-      findsOneWidget,
-    );
+    expect(find.text('🔔 E-Posta Bildirimleri'), findsNothing);
+    expect(find.textContaining('Güncelleme Notları'), findsOneWidget);
+    expect(find.textContaining('Bulut Yedekleme'), findsOneWidget);
   });
 
-  testWidgets('shows signed-in email summary preferences and persists toggle', (
+  testWidgets('keeps the app settings page functional without email controls', (
     tester,
   ) async {
-    final prefs = <String, Object>{
-      'email_summary_fund_time': '09:30',
-      'email_summary_stock_time': '18:30',
-      'email_summary_fund_last_sent_at': '2026-08-13T09:30:00.000',
-    };
-    SharedPreferences.setMockInitialValues(prefs);
     final user = UserAccount(
       id: 'user-1',
       email: 'drive@example.com',
@@ -137,18 +125,8 @@ void main() {
 
     await tester.pumpAndSettle();
 
-    expect(find.text('Gönderilecek Adres: drive@example.com'), findsOneWidget);
-    expect(find.text('Saat: 09:30'), findsOneWidget);
-    expect(find.text('Saat: 18:30'), findsOneWidget);
-    expect(
-      find.textContaining('Son Gönderim: 13.08.2026 09:30'),
-      findsOneWidget,
-    );
-
-    await tester.tap(find.byType(Switch).first);
-    await tester.pumpAndSettle();
-
-    final sharedPreferences = await SharedPreferences.getInstance();
-    expect(sharedPreferences.getBool('email_summary_fund_enabled'), isTrue);
+    expect(find.text('🔔 E-Posta Bildirimleri'), findsNothing);
+    expect(find.text('Google Hesabı: drive@example.com'), findsOneWidget);
+    expect(find.textContaining('Bulut Yedekleme'), findsOneWidget);
   });
 }

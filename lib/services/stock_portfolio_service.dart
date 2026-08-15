@@ -14,10 +14,7 @@ class StockPortfolioService {
     final Map<String, List<StockTransaction>> grouped = {};
 
     for (final transaction in transactions) {
-      grouped.putIfAbsent(
-        transaction.stockSymbol,
-        () => [],
-      );
+      grouped.putIfAbsent(transaction.stockSymbol, () => []);
 
       grouped[transaction.stockSymbol]!.add(transaction);
     }
@@ -52,10 +49,16 @@ class StockPortfolioService {
 
       final stock = await _stockService.getStockDetail(symbol);
       final currentPrice = stock.currentPrice ?? 0.0;
+      final previousClose = stock.previousClose ?? currentPrice;
       final currentValue = netQuantity * currentPrice;
       final profitLoss = currentValue - costValue;
-      final profitLossPercent =
-          costValue == 0 ? 0.0 : ((profitLoss / costValue) * 100);
+      final profitLossPercent = costValue == 0
+          ? 0.0
+          : ((profitLoss / costValue) * 100);
+      final dailyChangePercent = previousClose == 0
+          ? 0.0
+          : ((currentPrice - previousClose) / previousClose) * 100;
+      final dailyChangeValue = (currentPrice - previousClose) * netQuantity;
 
       holdings.add(
         StockHolding(
@@ -67,6 +70,8 @@ class StockPortfolioService {
           currentValue: currentValue,
           profitLoss: profitLoss,
           profitLossPercent: profitLossPercent,
+          dailyChangePercent: dailyChangePercent,
+          dailyChangeValue: dailyChangeValue,
         ),
       );
     }

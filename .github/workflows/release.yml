@@ -9,6 +9,7 @@ on:
       - master
     paths:
       - 'pubspec.yaml'
+      - 'release_notes.json'
       - 'lib/**'
       - 'android/**'
       - '.github/workflows/release.yml'

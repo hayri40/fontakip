@@ -218,23 +218,28 @@ class _StockPortfolioScreenState extends State<StockPortfolioScreen> {
                             ],
                           ),
                         ),
-                        Expanded(
-                          child: Container(
-                            padding: const EdgeInsets.symmetric(
-                              horizontal: 8,
-                              vertical: 6,
-                            ),
-                            decoration: BoxDecoration(
-                              color: dailyColor.withOpacity(0.09),
-                              borderRadius: BorderRadius.circular(8),
-                            ),
-                            child: Column(
+                        Flexible(
+                          fit: FlexFit.loose,
+                          child: Align(
+                            alignment: Alignment.center,
+                            child: ConstrainedBox(
+                              constraints: const BoxConstraints(maxWidth: 120),
+                              child: Container(
+                                padding: const EdgeInsets.symmetric(
+                                  horizontal: 4,
+                                  vertical: 5,
+                                ),
+                                decoration: BoxDecoration(
+                                  color: dailyColor.withOpacity(0.09),
+                                  borderRadius: BorderRadius.circular(8),
+                                ),
+                                child: Column(
                               crossAxisAlignment: CrossAxisAlignment.center,
                               children: [
                                 const Text(
                                   'Günlük',
                                   style: TextStyle(
-                                    fontSize: 10,
+                                    fontSize: 9,
                                     color: Colors.grey,
                                     fontWeight: FontWeight.w600,
                                   ),
@@ -248,7 +253,7 @@ class _StockPortfolioScreenState extends State<StockPortfolioScreen> {
                                       style: TextStyle(
                                         color: dailyColor,
                                         fontWeight: FontWeight.bold,
-                                        fontSize: 12,
+                                        fontSize: 11,
                                       ),
                                     ),
                                     const SizedBox(width: 4),
@@ -259,7 +264,7 @@ class _StockPortfolioScreenState extends State<StockPortfolioScreen> {
                                       style: TextStyle(
                                         color: dailyColor,
                                         fontWeight: FontWeight.w700,
-                                        fontSize: 12,
+                                        fontSize: 11,
                                       ),
                                     ),
                                   ],
@@ -272,11 +277,12 @@ class _StockPortfolioScreenState extends State<StockPortfolioScreen> {
                                   style: TextStyle(
                                     color: dailyColor,
                                     fontWeight: FontWeight.w700,
-                                    fontSize: 11,
+                                    fontSize: 10,
                                   ),
                                 ),
                               ],
-                            ),
+                                ),
+                              ),
                           ),
                         ),
                         Expanded(
@@ -286,7 +292,7 @@ class _StockPortfolioScreenState extends State<StockPortfolioScreen> {
                               Text(
                                 AppFormatters.quantityLabel(holding.totalQuantity),
                                 style: const TextStyle(
-                                  fontSize: 12,
+                                  fontSize: 11,
                                   fontWeight: FontWeight.bold,
                                   color: Colors.white,
                                 ),
@@ -297,15 +303,21 @@ class _StockPortfolioScreenState extends State<StockPortfolioScreen> {
                                 style: const TextStyle(
                                   color: Colors.amber,
                                   fontWeight: FontWeight.bold,
+                                  fontSize: 11,
                                 ),
                               ),
                               const SizedBox(height: 2),
-                              Text(
-                                'Toplam K/Z: ${AppFormatters.signedCurrencyValue(holding.profitLoss)} '
-                                '(${AppFormatters.percentValue(holding.profitLossPercent)})',
-                                style: TextStyle(
-                                  color: profitColor,
-                                  fontWeight: FontWeight.w600,
+                              FittedBox(
+                                fit: BoxFit.scaleDown,
+                                alignment: Alignment.centerRight,
+                                child: Text(
+                                  'Toplam K/Z: ${AppFormatters.signedCurrencyValue(holding.profitLoss)} '
+                                  '(${AppFormatters.percentValue(holding.profitLossPercent)})',
+                                  style: TextStyle(
+                                    color: profitColor,
+                                    fontWeight: FontWeight.w600,
+                                    fontSize: 11,
+                                  ),
                                 ),
                               ),
                             ],

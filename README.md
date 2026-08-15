@@ -84,8 +84,10 @@ Ayarlar → ☁ Bulut Yedekleme
 # 1. pubspec.yaml içinde sürümü güncelle
 version: 1.0.2+3
 
-# 2. Git'e commit ve push
-git add pubspec.yaml
+# 2. release_notes.json içindeki özel notları güncelle
+
+# 3. Git'e commit ve push
+git add pubspec.yaml release_notes.json
 git commit -m "Bump version to 1.0.2"
 git push origin master
 ```
@@ -94,8 +96,9 @@ git push origin master
 1. ✅ APK derler
 2. ✅ GitHub Release oluşturur
 3. ✅ APK'yı release'e yükler
-4. ✅ version.json günceller
-5. ✅ Kullanıcılar otomatik güncelleme görebilir
+4. ✅ release_notes.json içindeki notlarla release body oluşturur
+5. ✅ version.json günceller
+6. ✅ Kullanıcılar otomatik güncelleme görebilir
 
 ### Workflow Dosyası
 
@@ -107,10 +110,11 @@ git push origin master
   2. Bağımlılıkları yükle
   3. Sürümü pubspec.yaml'dan oku
   4. APK derle (release)
-  5. GitHub Release oluştur (vX.X.X tag'ı)
-  6. APK'yı release'e yükle
-  7. version.json otomatik güncelle
-  8. version.json'u master'a push et
+  5. release_notes.json içinden özel release notlarını oku
+  6. GitHub Release oluştur (vX.X.X tag'ı)
+  7. APK'yı release'e yükle
+  8. version.json otomatik güncelle
+  9. version.json'u master'a push et
 
 ### Önemli Dosyalar
 
@@ -152,7 +156,7 @@ version: 1.0.1+2
 {
   "version": "1.0.1",
   "releaseDate": "2026-08-12",
-  "notes": [...],
+  "notes": ["Özel release notları"],
   "apkUrl": "https://github.com/.../releases/download/v1.0.1/fontakip-1.0.1.apk"
 }
 ```
@@ -199,4 +203,3 @@ Hata raporları ve öneriler için GitHub Issues kullanın.
 
 **Sürüm:** 1.0.1  
 **Son Güncelleme:** 2026-08-12
-

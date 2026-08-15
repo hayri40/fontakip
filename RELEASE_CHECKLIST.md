@@ -23,7 +23,7 @@ version: 1.0.2+3
 ### 2️⃣ Git'e Commit ve Push
 
 ```bash
-git add pubspec.yaml
+git add pubspec.yaml release_notes.json
 git commit -m "Bump version to 1.0.2"
 git push origin master
 ```
@@ -40,10 +40,11 @@ git push origin master
 3. ✅ Get dependencies
 4. ✅ Extract version from pubspec.yaml
 5. ✅ Build APK (flutter build apk --release)
-6. ✅ Create GitHub Release with tag (v1.0.2)
-7. ✅ Upload APK to release assets
-8. ✅ Update version.json
-9. ✅ Push version.json back to master
+6. ✅ Read release_notes.json
+7. ✅ Create GitHub Release with tag (v1.0.2)
+8. ✅ Upload APK to release assets
+9. ✅ Update version.json
+10. ✅ Push version.json back to master
 
 ### 4️⃣ Başarılı Yayın Kontrol Et
 
@@ -66,7 +67,7 @@ Dosya güncellenmiş olmalı:
 {
   "version": "1.0.2",
   "releaseDate": "2026-08-12",
-  "notes": ["Otomatik olarak GitHub Actions tarafından..."],
+  "notes": ["Özel release notları"],
   "apkUrl": "https://github.com/.../releases/download/v1.0.2/fontakip-1.0.2.apk"
 }
 ```
@@ -102,10 +103,7 @@ APK dosyası: `build/app/outputs/flutter-apk/app-release.apk`
 {
   "version": "1.0.2",
   "releaseDate": "2026-08-12",
-  "notes": [
-    "Yeni özellikler eklendi",
-    "Hata düzeltmeleri yapıldı"
-  ],
+  "notes": ["Özel release notları"],
   "apkUrl": "https://github.com/hayri40/fontakip/releases/download/v1.0.2/app-release.apk"
 }
 ```
@@ -156,6 +154,7 @@ Yeni sürüm öncesi:
 - [ ] Release APK lokal'de derlenebiliyor mi?
 - [ ] Version numarası artırıldı mı?
 - [ ] GitHub Actions workflow'u güncellenmiş mi?
+- [ ] release_notes.json güncellenmiş mi?
 - [ ] README güncellenmiş mi? (opsiyonel)
 
 ---

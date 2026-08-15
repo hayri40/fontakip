@@ -93,33 +93,6 @@ jobs:
           echo "Build failed. Check logs above."
           exit 1
 
-      - name: Create Release
-        id: create_release
-        uses: actions/create-release@v1
-        env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-        with:
-          tag_name: ${{ steps.version.outputs.tag }}
-          release_name: FontTakip ${{ steps.version.outputs.version }}
-          body: |
-            ## FontTakip ${{ steps.version.outputs.version }}
-            
-            Otomatik olarak oluşturulan release.
-            
-            **APK Download:** Aşağıdaki release dosyasını indirin.
-          draft: false
-          prerelease: false
-
-      - name: Upload APK to Release
-        uses: actions/upload-release-asset@v1
-        env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-        with:
-          upload_url: ${{ steps.create_release.outputs.upload_url }}
-          asset_path: ./build/app/outputs/flutter-apk/app-release.apk
-          asset_name: fontakip-${{ steps.version.outputs.version }}.apk
-          asset_content_type: application/vnd.android.package-archive
-
       - name: Get Release APK Download URL
         id: apk_url
         run: |
@@ -133,19 +106,97 @@ jobs:
           DATE=$(date +"%Y-%m-%d")
           echo "date=$DATE" >> $GITHUB_OUTPUT
 
-      - name: Update version.json
+      - name: Prepare release notes
+        id: release_notes
+        env:
+          VERSION: ${{ steps.version.outputs.version }}
+          RELEASE_DATE: ${{ steps.date.outputs.date }}
+          APK_URL: ${{ steps.apk_url.outputs.apk_url }}
         run: |
-          cat > version.json << 'EOF'
-          {
-            "version": "${{ steps.version.outputs.version }}",
-            "releaseDate": "${{ steps.date.outputs.date }}",
-            "notes": [
-              "Otomatik olarak GitHub Actions tarafından oluşturulan release"
-            ],
-            "apkUrl": "${{ steps.apk_url.outputs.apk_url }}"
+          python3 - <<'PY'
+          import json
+          import os
+          import sys
+          from pathlib import Path
+
+          version = os.environ['VERSION']
+          release_date = os.environ['RELEASE_DATE']
+          apk_url = os.environ['APK_URL']
+          notes_path = Path('release_notes.json')
+
+          if not notes_path.exists():
+              print('release_notes.json bulunamadı.', file=sys.stderr)
+              sys.exit(1)
+
+          data = json.loads(notes_path.read_text(encoding='utf-8'))
+          file_version = str(data.get('version', '')).strip()
+          notes = data.get('notes')
+
+          if file_version not in ('', version):
+              print('release_notes.json içindeki version pubspec sürümüyle eşleşmiyor.', file=sys.stderr)
+              sys.exit(1)
+
+          if not isinstance(notes, list):
+              print('release_notes.json içindeki notes alanı bir liste olmalı.', file=sys.stderr)
+              sys.exit(1)
+
+          cleaned_notes = [
+              note.strip()
+              for note in notes
+              if isinstance(note, str) and note.strip()
+          ]
+
+          if not cleaned_notes:
+              print('release_notes.json en az bir özel not içermeli.', file=sys.stderr)
+              sys.exit(1)
+
+          version_json = {
+              'version': version,
+              'releaseDate': release_date,
+              'notes': cleaned_notes,
+              'apkUrl': apk_url,
           }
-          EOF
-          cat version.json
+          Path('version.json').write_text(
+              json.dumps(version_json, ensure_ascii=False, indent=2) + '\n',
+              encoding='utf-8',
+          )
+
+          body_lines = [
+              f'## FontTakip {version}',
+              '',
+              '### Sürüm Notları',
+              '',
+          ]
+          body_lines.extend(f'- {note}' for note in cleaned_notes)
+          body = '\n'.join(body_lines)
+
+          with open(os.environ['GITHUB_OUTPUT'], 'a', encoding='utf-8') as output_file:
+              output_file.write('body<<EOF\n')
+              output_file.write(body)
+              output_file.write('\nEOF\n')
+          PY
+
+      - name: Create Release
+        id: create_release
+        uses: actions/create-release@v1
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        with:
+          tag_name: ${{ steps.version.outputs.tag }}
+          release_name: FontTakip ${{ steps.version.outputs.version }}
+          body: ${{ steps.release_notes.outputs.body }}
+          draft: false
+          prerelease: false
+
+      - name: Upload APK to Release
+        uses: actions/upload-release-asset@v1
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        with:
+          upload_url: ${{ steps.create_release.outputs.upload_url }}
+          asset_path: ./build/app/outputs/flutter-apk/app-release.apk
+          asset_name: fontakip-${{ steps.version.outputs.version }}.apk
+          asset_content_type: application/vnd.android.package-archive
 
       - name: Commit and push version.json
         run: |

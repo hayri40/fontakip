@@ -33,6 +33,7 @@ git push origin master
 - GitHub repository'ye git
 - **Actions** sekmesine tıkla
 - **Build and Release** workflow'unu gözlemle
+- Gerekirse workflow'u elle de çalıştırabilirsin (`workflow_dispatch`)
 
 **Workflow Aşamaları:**
 1. ✅ Checkout code
@@ -40,11 +41,12 @@ git push origin master
 3. ✅ Get dependencies
 4. ✅ Extract version from pubspec.yaml
 5. ✅ Build APK (flutter build apk --release)
-6. ✅ Read release_notes.json
-7. ✅ Create GitHub Release with tag (v1.0.2)
-8. ✅ Upload APK to release assets
-9. ✅ Update version.json
-10. ✅ Push version.json back to master
+6. ✅ Validate release_notes.json notes alanı
+7. ✅ Sync release_notes.json version alanı from pubspec.yaml
+8. ✅ Create GitHub Release with tag (v1.0.2)
+9. ✅ Upload APK to release assets
+10. ✅ Update version.json
+11. ✅ Push generated metadata back to master
 
 ### 4️⃣ Başarılı Yayın Kontrol Et
 
@@ -141,7 +143,7 @@ flutter build apk --release -v
 
 ### version.json Güncellenmiyor
 
-- Workflow'un "Commit and push version.json" adımında başarılı olduğunu kontrol et
+- Workflow'un "Commit and push generated release metadata" adımında başarılı olduğunu kontrol et
 - GitHub token'ın doğru izinlere sahip olduğunu doğrula
 
 ---
@@ -154,7 +156,7 @@ Yeni sürüm öncesi:
 - [ ] Release APK lokal'de derlenebiliyor mi?
 - [ ] Version numarası artırıldı mı?
 - [ ] GitHub Actions workflow'u güncellenmiş mi?
-- [ ] release_notes.json güncellenmiş mi?
+- [ ] release_notes.json içindeki notes güncellenmiş mi?
 - [ ] README güncellenmiş mi? (opsiyonel)
 
 ---
@@ -188,6 +190,7 @@ v2.0.0   → Büyük refactor
 
 - GitHub Actions logları **Actions** → **Build and Release** → ilgili run'da görülebilir
 - `[skip ci]` tag'ı workflow'un yeniden çalışmasını engeller
+- `pubspec.yaml` sürümü tek doğru kaynaktır
 - version.json'daki apkUrl GitHub release URL'si olmalı
 - APK dosya adı `fontakip-{version}.apk` formatında olmalı
 

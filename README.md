@@ -84,7 +84,7 @@ Ayarlar → ☁ Bulut Yedekleme
 # 1. pubspec.yaml içinde sürümü güncelle
 version: 1.0.2+3
 
-# 2. release_notes.json içindeki özel notları güncelle
+# 2. release_notes.json içindeki notes listesini güncelle
 
 # 3. Git'e commit ve push
 git add pubspec.yaml release_notes.json
@@ -96,25 +96,26 @@ git push origin master
 1. ✅ APK derler
 2. ✅ GitHub Release oluşturur
 3. ✅ APK'yı release'e yükler
-4. ✅ release_notes.json içindeki notlarla release body oluşturur
-5. ✅ version.json günceller
-6. ✅ Kullanıcılar otomatik güncelleme görebilir
+4. ✅ pubspec.yaml sürümünü release_notes.json içine otomatik yazar
+5. ✅ release_notes.json içindeki notlarla release body oluşturur
+6. ✅ version.json günceller
+7. ✅ Kullanıcılar otomatik güncelleme görebilir
 
 ### Workflow Dosyası
 
 `.github/workflows/release.yml`
 
-- **Tetikleyici**: master branch'e push (pubspec.yaml, lib/**, android/**)
+- **Tetikleyici**: master branch'e `pubspec.yaml` değişikliği ile push veya manuel workflow çalıştırma
 - **Adımlar**:
   1. Flutter kurulumu
   2. Bağımlılıkları yükle
   3. Sürümü pubspec.yaml'dan oku
   4. APK derle (release)
-  5. release_notes.json içinden özel release notlarını oku
-  6. GitHub Release oluştur (vX.X.X tag'ı)
-  7. APK'yı release'e yükle
-  8. version.json otomatik güncelle
-  9. version.json'u master'a push et
+  5. release_notes.json içindeki notes alanını doğrula
+  6. pubspec sürümünü release_notes.json ve version.json içine otomatik yaz
+  7. GitHub Release oluştur (vX.X.X tag'ı)
+  8. APK'yı release'e yükle
+  9. Üretilen metadata dosyalarını master'a push et
 
 ### Önemli Dosyalar
 
@@ -139,6 +140,7 @@ fontakip/
 │       ├── settings_screen.dart             # Ayarlar + Güncellemeler
 │       └── update_notes_screen.dart         # Güncelleme notları
 ├── pubspec.yaml                 # Uygulama sürümü
+├── release_notes.json           # Özel release notları (version alanı otomatik senkronlanır)
 └── version.json                 # GitHub'daki sürüm bilgisi
 ```
 
@@ -150,6 +152,17 @@ version: 1.0.1+2
 # 1.0.1 = Semantic version
 # 2 = Build number
 ```
+
+**release_notes.json:**
+```json
+{
+  "version": "1.0.1",
+  "notes": ["Özel release notları"]
+}
+```
+
+- `version` alanı workflow tarafından `pubspec.yaml` üzerinden otomatik güncellenir.
+- Manuel olarak sadece `notes` listesini düzenlemen gerekir.
 
 **version.json:**
 ```json

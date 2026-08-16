@@ -4,15 +4,12 @@ permissions:
   contents: write
 
 on:
+  workflow_dispatch:
   push:
     branches:
       - master
     paths:
       - 'pubspec.yaml'
-      - 'release_notes.json'
-      - 'lib/**'
-      - 'android/**'
-      - '.github/workflows/release.yml'
 
 jobs:
   build:
@@ -107,8 +104,8 @@ jobs:
           DATE=$(date +"%Y-%m-%d")
           echo "date=$DATE" >> $GITHUB_OUTPUT
 
-      - name: Prepare release notes
-        id: release_notes
+      - name: Sync release metadata
+        id: release_metadata
         env:
           VERSION: ${{ steps.version.outputs.version }}
           RELEASE_DATE: ${{ steps.date.outputs.date }}
@@ -130,12 +127,7 @@ jobs:
               sys.exit(1)
 
           data = json.loads(notes_path.read_text(encoding='utf-8'))
-          file_version = str(data.get('version', '')).strip()
           notes = data.get('notes')
-
-          if file_version not in ('', version):
-              print('release_notes.json içindeki version pubspec sürümüyle eşleşmiyor.', file=sys.stderr)
-              sys.exit(1)
 
           if not isinstance(notes, list):
               print('release_notes.json içindeki notes alanı bir liste olmalı.', file=sys.stderr)
@@ -150,6 +142,15 @@ jobs:
           if not cleaned_notes:
               print('release_notes.json en az bir özel not içermeli.', file=sys.stderr)
               sys.exit(1)
+
+          release_notes_json = {
+              'version': version,
+              'notes': cleaned_notes,
+          }
+          notes_path.write_text(
+              json.dumps(release_notes_json, ensure_ascii=False, indent=2) + '\n',
+              encoding='utf-8',
+          )
 
           version_json = {
               'version': version,
@@ -185,7 +186,7 @@ jobs:
         with:
           tag_name: ${{ steps.version.outputs.tag }}
           release_name: FontTakip ${{ steps.version.outputs.version }}
-          body: ${{ steps.release_notes.outputs.body }}
+          body: ${{ steps.release_metadata.outputs.body }}
           draft: false
           prerelease: false
 
@@ -199,12 +200,16 @@ jobs:
           asset_name: fontakip-${{ steps.version.outputs.version }}.apk
           asset_content_type: application/vnd.android.package-archive
 
-      - name: Commit and push version.json
+      - name: Commit and push generated release metadata
         run: |
           git config --local user.email "action@github.com"
           git config --local user.name "GitHub Action"
-          git add version.json
-          git commit -m "Update version.json for release ${{ steps.version.outputs.tag }} [skip ci]"
+          git add release_notes.json version.json
+          if git diff --cached --quiet; then
+            echo "No generated metadata changes to commit."
+            exit 0
+          fi
+          git commit -m "Sync release metadata for ${{ steps.version.outputs.tag }} [skip ci]"
           git push
 
       - name: Notify on success

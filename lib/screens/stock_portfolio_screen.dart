@@ -162,12 +162,7 @@ class _StockPortfolioScreenState extends State<StockPortfolioScreen> {
             ),
           ),
           ..._holdings.map((holding) {
-            final isProfit = holding.profitLoss >= 0;
-            final profitColor = isProfit ? Colors.green : Colors.red;
-            final dailyColor = holding.dailyChangeValue >= 0
-                ? Colors.green
-                : Colors.red;
-            final dailyArrow = holding.dailyChangeValue >= 0 ? '▲' : '▼';
+            final profitColor = holding.profitLoss >= 0 ? Colors.green : Colors.red;
             final payPercent = totalCurrent == 0
                 ? 0.0
                 : (holding.currentValue / totalCurrent) * 100;
@@ -176,155 +171,110 @@ class _StockPortfolioScreenState extends State<StockPortfolioScreen> {
               margin: const EdgeInsets.only(bottom: 12),
               child: Padding(
                 padding: const EdgeInsets.all(16),
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
+                child: Row(
+                  crossAxisAlignment: CrossAxisAlignment.center,
                   children: [
-                    SizedBox(
-                      width: double.infinity,
-                      child: Stack(
-                        alignment: Alignment.center,
+                    Expanded(
+                      flex: 2,
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        mainAxisSize: MainAxisSize.min,
                         children: [
                           Text(
-                            '${holding.symbol} (${AppFormatters.currencyValue(holding.currentPrice)})',
+                            holding.symbol,
                             style: const TextStyle(
-                              fontSize: 20,
-                              fontWeight: FontWeight.bold,
+                              fontSize: 18,
+                              fontWeight: FontWeight.w700,
+                            ),
+                          ),
+                          const SizedBox(height: 8),
+                          Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              const Text(
+                                'Pay',
+                                style: TextStyle(
+                                  color: Colors.amber,
+                                  fontWeight: FontWeight.w700,
+                                  fontSize: 12,
+                                ),
+                              ),
+                              Text(
+                                AppFormatters.percentValue(payPercent),
+                                style: const TextStyle(
+                                  color: Colors.amber,
+                                  fontWeight: FontWeight.w700,
+                                  fontSize: 12,
+                                ),
+                              ),
+                            ],
+                          ),
+                        ],
+                      ),
+                    ),
+                    Expanded(
+                      flex: 4,
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          Text(
+                            'Mal_Fiyatı: ${AppFormatters.currencyValue(holding.averageCost)}',
+                            style: const TextStyle(fontSize: 12),
+                          ),
+                          const SizedBox(height: 6),
+                          Text(
+                            'Adet: ${AppFormatters.quantityLabel(holding.totalQuantity)}',
+                            style: const TextStyle(fontSize: 12),
+                          ),
+                          const SizedBox(height: 6),
+                          Text(
+                            'Toplam: ${AppFormatters.currencyValue(holding.costValue)}',
+                            style: const TextStyle(
+                              color: Colors.orange,
+                              fontSize: 12,
                             ),
                           ),
                         ],
                       ),
                     ),
-                    const SizedBox(height: 12),
-                    Row(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        Expanded(
-                          child: Column(
-                            crossAxisAlignment: CrossAxisAlignment.start,
-                            children: [
-                              Text(
-                                'Ort. Maliyet: ${AppFormatters.currencyValue(holding.averageCost)}',
-                              ),
-                              const SizedBox(height: 2),
-                              Text(
-                                'Güncel: ${AppFormatters.currencyValue(holding.currentValue)}',
-                                style: const TextStyle(color: Colors.cyan),
-                              ),
-                              const SizedBox(height: 2),
-                              Text(
-                                'Maliyet: ${AppFormatters.currencyValue(holding.costValue)}',
-                                style: const TextStyle(color: Colors.orange),
-                              ),
-                            ],
+                    Expanded(
+                      flex: 4,
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          Text(
+                            'Gün_Fiyatı: ${AppFormatters.currencyValue(holding.currentPrice)}',
+                            style: const TextStyle(
+                              color: Colors.cyan,
+                              fontSize: 12,
+                            ),
                           ),
-                        ),
-                        Flexible(
-                          fit: FlexFit.loose,
-                          child: Align(
-                            alignment: Alignment.center,
-                            child: ConstrainedBox(
-                              constraints: const BoxConstraints(maxWidth: 120),
-                              child: Container(
-                                padding: const EdgeInsets.symmetric(
-                                  horizontal: 4,
-                                  vertical: 5,
-                                ),
-                                decoration: BoxDecoration(
-                                  color: dailyColor.withOpacity(0.09),
-                                  borderRadius: BorderRadius.circular(8),
-                                ),
-                                child: Column(
-                                  crossAxisAlignment: CrossAxisAlignment.center,
-                                  children: [
-                                    const Text(
-                                      'Günlük',
-                                      style: TextStyle(
-                                        fontSize: 9,
-                                        color: Colors.grey,
-                                        fontWeight: FontWeight.w600,
-                                      ),
-                                    ),
-                                    const SizedBox(height: 2),
-                                    Row(
-                                      mainAxisAlignment: MainAxisAlignment.center,
-                                      children: [
-                                        Text(
-                                          dailyArrow,
-                                          style: TextStyle(
-                                            color: dailyColor,
-                                            fontWeight: FontWeight.bold,
-                                            fontSize: 11,
-                                          ),
-                                        ),
-                                        const SizedBox(width: 4),
-                                        Text(
-                                          AppFormatters.signedPercentValue(
-                                            holding.dailyChangePercent,
-                                          ),
-                                          style: TextStyle(
-                                            color: dailyColor,
-                                            fontWeight: FontWeight.w700,
-                                            fontSize: 11,
-                                          ),
-                                        ),
-                                      ],
-                                    ),
-                                    const SizedBox(height: 2),
-                                    Text(
-                                      AppFormatters.signedCurrencyValue(
-                                        holding.dailyChangeValue,
-                                      ),
-                                      style: TextStyle(
-                                        color: dailyColor,
-                                        fontWeight: FontWeight.w700,
-                                        fontSize: 10,
-                                      ),
-                                    ),
-                                  ],
-                                ),
+                          const SizedBox(height: 6),
+                          FittedBox(
+                            fit: BoxFit.scaleDown,
+                            alignment: Alignment.centerLeft,
+                            child: Text(
+                              'K/Z: ${AppFormatters.signedCurrencyValue(holding.profitLoss)} '
+                              '(${AppFormatters.percentValue(holding.profitLossPercent)})',
+                              style: TextStyle(
+                                color: profitColor,
+                                fontWeight: FontWeight.w600,
+                                fontSize: 12,
                               ),
                             ),
                           ),
-                        ),
-                        Expanded(
-                          child: Column(
-                            crossAxisAlignment: CrossAxisAlignment.end,
-                            children: [
-                              Text(
-                                AppFormatters.quantityLabel(holding.totalQuantity),
-                                style: const TextStyle(
-                                  fontSize: 11,
-                                  fontWeight: FontWeight.bold,
-                                  color: Colors.white,
-                                ),
-                              ),
-                              const SizedBox(height: 2),
-                              Text(
-                                'Pay ${AppFormatters.percentValue(payPercent)}',
-                                style: const TextStyle(
-                                  color: Colors.amber,
-                                  fontWeight: FontWeight.bold,
-                                  fontSize: 11,
-                                ),
-                              ),
-                              const SizedBox(height: 2),
-                              FittedBox(
-                                fit: BoxFit.scaleDown,
-                                alignment: Alignment.centerRight,
-                                child: Text(
-                                  'Toplam K/Z: ${AppFormatters.signedCurrencyValue(holding.profitLoss)} '
-                                  '(${AppFormatters.percentValue(holding.profitLossPercent)})',
-                                  style: TextStyle(
-                                    color: profitColor,
-                                    fontWeight: FontWeight.w600,
-                                    fontSize: 11,
-                                  ),
-                                ),
-                              ),
-                            ],
+                          const SizedBox(height: 6),
+                          Text(
+                            'Toplam: ${AppFormatters.currencyValue(holding.currentValue)}',
+                            style: const TextStyle(
+                              color: Colors.cyan,
+                              fontSize: 12,
+                            ),
                           ),
-                        ),
-                      ],
+                        ],
+                      ),
                     ),
                   ],
                 ),

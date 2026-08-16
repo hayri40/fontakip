@@ -96,6 +96,26 @@ class _SettingsScreenState extends State<SettingsScreen> {
     final cloudBackupInfo = await _cloudBackupService.getBackupInfo();
     final emailSummaryPreferences = await _emailSummaryPreferencesService
         .load();
+    VersionInfo? persistedLatestVersion;
+    if (lastVersionValue != null && lastVersionValue.isNotEmpty) {
+      try {
+        final decoded = jsonDecode(lastVersionValue);
+        if (decoded is Map<String, dynamic>) {
+          persistedLatestVersion = VersionInfo.fromJson(decoded);
+        }
+      } catch (_) {
+        persistedLatestVersion = null;
+      }
+    }
+
+    var updateAvailable = prefs.getBool(_lastUpdateAvailableKey) ?? false;
+    if (persistedLatestVersion != null &&
+        persistedLatestVersion.version.trim().isNotEmpty) {
+      updateAvailable = _updateService.hasNewVersion(
+        packageInfo.version,
+        persistedLatestVersion.version,
+      );
+    }
 
     if (!mounted) {
       return;
@@ -109,17 +129,8 @@ class _SettingsScreenState extends State<SettingsScreen> {
       _updateCheckAttempted =
           lastVersionValue != null || timestampValue != null;
       _updateCheckFailed = prefs.getBool(_lastCheckFailedKey) ?? false;
-      if (lastVersionValue != null && lastVersionValue.isNotEmpty) {
-        try {
-          final decoded = jsonDecode(lastVersionValue);
-          if (decoded is Map<String, dynamic>) {
-            _latestVersion = VersionInfo.fromJson(decoded);
-          }
-        } catch (_) {
-          _latestVersion = null;
-        }
-      }
-      _updateAvailable = prefs.getBool(_lastUpdateAvailableKey) ?? false;
+      _latestVersion = persistedLatestVersion;
+      _updateAvailable = updateAvailable;
       _cloudAuthState = cloudAuthState;
       _cloudBackupInfo = cloudBackupInfo;
       _emailSummaryPreferences = emailSummaryPreferences;

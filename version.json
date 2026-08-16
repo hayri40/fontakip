@@ -1,10 +1,10 @@
 {
-  "version": "1.1.1",
-  "releaseDate": "2026-08-15",
+  "version": "1.1.3",
+  "releaseDate": "2026-08-16",
   "notes": [
     "Portföy kartları kompakt üç bloklu düzene getirildi.",
     "Günlük performans alanı ortalandı ve hizalama düzeltildi.",
     "Güncelleme notları artık özel release notlarından üretiliyor."
   ],
-  "apkUrl": "https://github.com/hayri40/fontakip/releases/download/v1.1.1/fontakip-1.1.1.apk"
+  "apkUrl": "https://github.com/hayri40/fontakip/releases/download/v1.1.3/fontakip-1.1.3.apk"
 }

@@ -1,0 +1,218 @@
+name: Build and Release
+
+permissions:
+  contents: write
+
+on:
+  workflow_dispatch:
+  push:
+    branches:
+      - master
+    paths:
+      - 'pubspec.yaml'
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+        with:
+          token: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Setup Flutter
+        uses: subosito/flutter-action@v2
+        with:
+          flutter-version: '3.44.7'
+          channel: 'stable'
+          cache: true
+
+      - name: Setup Java (Gradle cache)
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '17'
+          cache: gradle
+
+      - name: Restore Pub cache
+        uses: actions/cache@v4
+        with:
+          path: ~/.pub-cache
+          key: ${{ runner.os }}-pub-${{ hashFiles('**/pubspec.lock') }}
+          restore-keys: |
+            ${{ runner.os }}-pub-
+
+      - name: Get dependencies
+        run: flutter pub get
+
+      - name: Extract version from pubspec.yaml
+        id: version
+        run: |
+          VERSION=$(grep '^version:' pubspec.yaml | awk '{print $2}' | cut -d'+' -f1)
+          echo "version=$VERSION" >> $GITHUB_OUTPUT
+          echo "tag=v$VERSION" >> $GITHUB_OUTPUT
+          echo "Current version: $VERSION"
+
+      - name: Validate Android signing secrets
+        env:
+          ANDROID_KEYSTORE_BASE64: ${{ secrets.ANDROID_KEYSTORE_BASE64 }}
+          ANDROID_KEYSTORE_PASSWORD: ${{ secrets.ANDROID_KEYSTORE_PASSWORD }}
+          ANDROID_KEY_ALIAS: ${{ secrets.ANDROID_KEY_ALIAS }}
+          ANDROID_KEY_PASSWORD: ${{ secrets.ANDROID_KEY_PASSWORD }}
+        run: |
+          if [ -z "$ANDROID_KEYSTORE_BASE64" ] || [ -z "$ANDROID_KEYSTORE_PASSWORD" ] || [ -z "$ANDROID_KEY_ALIAS" ] || [ -z "$ANDROID_KEY_PASSWORD" ]; then
+            echo "Android release signing secrets are missing. Configure ANDROID_KEYSTORE_BASE64, ANDROID_KEYSTORE_PASSWORD, ANDROID_KEY_ALIAS and ANDROID_KEY_PASSWORD in GitHub Secrets."
+            exit 1
+          fi
+
+      - name: Configure Android signing
+        env:
+          ANDROID_KEYSTORE_BASE64: ${{ secrets.ANDROID_KEYSTORE_BASE64 }}
+          ANDROID_KEYSTORE_PASSWORD: ${{ secrets.ANDROID_KEYSTORE_PASSWORD }}
+          ANDROID_KEY_ALIAS: ${{ secrets.ANDROID_KEY_ALIAS }}
+          ANDROID_KEY_PASSWORD: ${{ secrets.ANDROID_KEY_PASSWORD }}
+        run: |
+          mkdir -p android/app
+          echo "$ANDROID_KEYSTORE_BASE64" | base64 --decode > android/app/upload-keystore.jks
+          cat > android/key.properties <<EOF
+          storePassword=$ANDROID_KEYSTORE_PASSWORD
+          keyPassword=$ANDROID_KEY_PASSWORD
+          keyAlias=$ANDROID_KEY_ALIAS
+          storeFile=../app/upload-keystore.jks
+          EOF
+
+      - name: Build APK
+        run: flutter build apk --release
+
+      - name: Upload build logs on failure
+        if: failure()
+        run: |
+          echo "Build failed. Check logs above."
+          exit 1
+
+      - name: Get Release APK Download URL
+        id: apk_url
+        run: |
+          APK_URL="https://github.com/${{ github.repository }}/releases/download/${{ steps.version.outputs.tag }}/fontakip-${{ steps.version.outputs.version }}.apk"
+          echo "apk_url=$APK_URL" >> $GITHUB_OUTPUT
+          echo "APK URL: $APK_URL"
+
+      - name: Get current date
+        id: date
+        run: |
+          DATE=$(date +"%Y-%m-%d")
+          echo "date=$DATE" >> $GITHUB_OUTPUT
+
+      - name: Sync release metadata
+        id: release_metadata
+        env:
+          VERSION: ${{ steps.version.outputs.version }}
+          RELEASE_DATE: ${{ steps.date.outputs.date }}
+          APK_URL: ${{ steps.apk_url.outputs.apk_url }}
+        run: |
+          python3 - <<'PY'
+          import json
+          import os
+          import sys
+          from pathlib import Path
+
+          version = os.environ['VERSION']
+          release_date = os.environ['RELEASE_DATE']
+          apk_url = os.environ['APK_URL']
+          notes_path = Path('release_notes.json')
+
+          if not notes_path.exists():
+              print('release_notes.json bulunamadı.', file=sys.stderr)
+              sys.exit(1)
+
+          data = json.loads(notes_path.read_text(encoding='utf-8'))
+          notes = data.get('notes')
+
+          if not isinstance(notes, list):
+              print('release_notes.json içindeki notes alanı bir liste olmalı.', file=sys.stderr)
+              sys.exit(1)
+
+          cleaned_notes = [
+              note.strip()
+              for note in notes
+              if isinstance(note, str) and note.strip()
+          ]
+
+          if not cleaned_notes:
+              print('release_notes.json en az bir özel not içermeli.', file=sys.stderr)
+              sys.exit(1)
+
+          release_notes_json = {
+              'version': version,
+              'notes': cleaned_notes,
+          }
+          notes_path.write_text(
+              json.dumps(release_notes_json, ensure_ascii=False, indent=2) + '\n',
+              encoding='utf-8',
+          )
+
+          version_json = {
+              'version': version,
+              'releaseDate': release_date,
+              'notes': cleaned_notes,
+              'apkUrl': apk_url,
+          }
+          Path('version.json').write_text(
+              json.dumps(version_json, ensure_ascii=False, indent=2) + '\n',
+              encoding='utf-8',
+          )
+
+          body_lines = [
+              f'## FontTakip {version}',
+              '',
+              '### Sürüm Notları',
+              '',
+          ]
+          body_lines.extend(f'- {note}' for note in cleaned_notes)
+          body = '\n'.join(body_lines)
+
+          with open(os.environ['GITHUB_OUTPUT'], 'a', encoding='utf-8') as output_file:
+              output_file.write('body<<EOF\n')
+              output_file.write(body)
+              output_file.write('\nEOF\n')
+          PY
+
+      - name: Create Release
+        id: create_release
+        uses: actions/create-release@v1
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        with:
+          tag_name: ${{ steps.version.outputs.tag }}
+          release_name: FontTakip ${{ steps.version.outputs.version }}
+          body: ${{ steps.release_metadata.outputs.body }}
+          draft: false
+          prerelease: false
+
+      - name: Upload APK to Release
+        uses: actions/upload-release-asset@v1
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        with:
+          upload_url: ${{ steps.create_release.outputs.upload_url }}
+          asset_path: ./build/app/outputs/flutter-apk/app-release.apk
+          asset_name: fontakip-${{ steps.version.outputs.version }}.apk
+          asset_content_type: application/vnd.android.package-archive
+
+      - name: Commit and push generated release metadata
+        run: |
+          git config --local user.email "action@github.com"
+          git config --local user.name "GitHub Action"
+          git add release_notes.json version.json
+          if git diff --cached --quiet; then
+            echo "No generated metadata changes to commit."
+            exit 0
+          fi
+          git commit -m "Sync release metadata for ${{ steps.version.outputs.tag }} [skip ci]"
+          git push
+
+      - name: Notify on success
+        run: |
+          echo "✅ Release ${{ steps.version.outputs.tag }} completed successfully!"
+          echo "📦 APK: ${{ steps.apk_url.outputs.apk_url }}"

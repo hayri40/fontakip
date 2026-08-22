@@ -1,0 +1,20 @@
+{
+  "name": "fontakip-mail-worker",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "description": "Cloud Run worker for FontTakip daily portfolio summary emails",
+  "scripts": {
+    "start": "node src/index.js",
+    "test": "node --test"
+  },
+  "engines": {
+    "node": ">=20"
+  },
+  "dependencies": {
+    "@google-cloud/firestore": "^7.11.0",
+    "express": "^4.21.2",
+    "googleapis": "^150.0.1",
+    "date-holidays": "^3.25.0"
+  }
+}

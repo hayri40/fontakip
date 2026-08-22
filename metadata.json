@@ -1,0 +1,7 @@
+{
+  "name": "FonTakip",
+  "description": "Fon, Hisse, FX Portföy Yönetimi ve Finansal Yatırım Araçları",
+  "capabilities": [
+    "MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"
+  ]
+}

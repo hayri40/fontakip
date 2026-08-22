@@ -1,0 +1,43 @@
+{
+  "entities": {
+    "user_profiles": {
+      "title": "User Profile",
+      "description": "User account and profile data",
+      "type": "object",
+      "properties": {
+        "userId": { "type": "string" },
+        "email": { "type": "string" },
+        "displayName": { "type": "string" },
+        "photoURL": { "type": "string" },
+        "lastSyncedAt": { "type": "string" }
+      },
+      "required": ["userId"]
+    },
+    "user_data": {
+      "title": "User Investment Portfolio Data",
+      "description": "Consolidated portfolio and user data for sync",
+      "type": "object",
+      "properties": {
+        "fundTransactions": { "type": "array" },
+        "stockTransactions": { "type": "array" },
+        "fundFavorites": { "type": "array" },
+        "stockFavorites": { "type": "array" },
+        "fxFavorites": { "type": "array" },
+        "debts": { "type": "array" },
+        "notes": { "type": "array" },
+        "performance": { "type": "array" },
+        "updatedAt": { "type": "string" }
+      }
+    }
+  },
+  "firestore": {
+    "/users/{userId}": {
+      "schema": "user_profiles",
+      "description": "User profile document"
+    },
+    "/users/{userId}/data/portfolio": {
+      "schema": "user_data",
+      "description": "User portfolio and investment state"
+    }
+  }
+}

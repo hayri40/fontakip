@@ -27,10 +27,12 @@ class _DataSourcesScreenState extends State<DataSourcesScreen> {
   final _stockApiKeyController = TextEditingController();
   final _fxProviderController = TextEditingController();
   final _fxApiKeyController = TextEditingController();
+  final _geminiApiKeyController = TextEditingController();
 
   bool _showFundApiKey = false;
   bool _showStockApiKey = false;
   bool _showFxApiKey = false;
+  bool _showGeminiApiKey = false;
   bool _stockAppendDotIs = false;
   bool _ready = false;
   bool _busy = false;
@@ -67,6 +69,7 @@ class _DataSourcesScreenState extends State<DataSourcesScreen> {
     _stockAppendDotIs = stock.appendDotIs;
     _fxProviderController.text = fx.providerName;
     _fxApiKeyController.text = fx.apiKey;
+    _geminiApiKeyController.text = await _settingsService.getGeminiApiKey();
 
     if (!mounted) return;
     setState(() {
@@ -105,6 +108,14 @@ class _DataSourcesScreenState extends State<DataSourcesScreen> {
     if (!mounted) return;
     ScaffoldMessenger.of(context).showSnackBar(
       const SnackBar(content: Text('FX veri kaynağı kaydedildi.')),
+    );
+  }
+
+  Future<void> _saveGemini() async {
+    await _settingsService.saveGeminiApiKey(_geminiApiKeyController.text);
+    if (!mounted) return;
+    ScaffoldMessenger.of(context).showSnackBar(
+      const SnackBar(content: Text('Gemini API anahtarı kaydedildi.')),
     );
   }
 
@@ -258,6 +269,46 @@ class _DataSourcesScreenState extends State<DataSourcesScreen> {
                   );
                 });
               },
+            ),
+          ),
+          const SizedBox(height: 12),
+          _sourceCard(
+            title: 'Gemini AI (FX Uzmanı)',
+            child: Column(
+              children: [
+                TextField(
+                  controller: _geminiApiKeyController,
+                  obscureText: !_showGeminiApiKey,
+                  decoration: InputDecoration(
+                    labelText: 'Gemini API Anahtarı',
+                    border: const OutlineInputBorder(),
+                    suffixIcon: IconButton(
+                      onPressed: () {
+                        setState(() {
+                          _showGeminiApiKey = !_showGeminiApiKey;
+                        });
+                      },
+                      icon: Icon(
+                        _showGeminiApiKey ? Icons.visibility_off : Icons.visibility,
+                      ),
+                    ),
+                  ),
+                ),
+                const SizedBox(height: 10),
+                SizedBox(
+                  width: double.infinity,
+                  child: FilledButton.icon(
+                    onPressed: _busy ? null : _saveGemini,
+                    icon: const Icon(Icons.save),
+                    label: const Text('API Anahtarını Kaydet'),
+                  ),
+                ),
+                const SizedBox(height: 4),
+                const Text(
+                  'FX Baş Stratejisti ile konuşabilmek için geçerli bir Gemini API anahtarı gereklidir.',
+                  style: TextStyle(fontSize: 11, color: Colors.grey),
+                ),
+              ],
             ),
           ),
           if (_busy) ...[

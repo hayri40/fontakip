@@ -45,6 +45,7 @@ class DataSourceSettingsService {
   static const _stockAppendDotIsKey = 'data_source.stock.append_dot_is';
   static const _fxProviderKey = 'data_source.fx.provider';
   static const _fxApiKeyKey = 'data_source.fx.api_key';
+  static const _geminiApiKeyKey = 'data_source.gemini.api_key';
 
   static final DataSourceSettingsService instance = DataSourceSettingsService._();
 
@@ -102,5 +103,15 @@ class DataSourceSettingsService {
     final prefs = await SharedPreferences.getInstance();
     await prefs.setString(_fxProviderKey, providerName.trim());
     await prefs.setString(_fxApiKeyKey, apiKey.trim());
+  }
+
+  Future<String> getGeminiApiKey() async {
+    final prefs = await SharedPreferences.getInstance();
+    return prefs.getString(_geminiApiKeyKey) ?? '';
+  }
+
+  Future<void> saveGeminiApiKey(String apiKey) async {
+    final prefs = await SharedPreferences.getInstance();
+    await prefs.setString(_geminiApiKeyKey, apiKey.trim());
   }
 }

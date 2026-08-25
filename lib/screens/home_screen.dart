@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import '../features/expert/screens/fx_strategist_hub_screen.dart';
 import 'fx_screen.dart';
 import 'general_portfolio_screen.dart';
 import 'stock_screen.dart';
@@ -102,7 +103,7 @@ class HomeScreen extends StatelessWidget {
               Navigator.push(
                 context,
                 MaterialPageRoute(
-                  builder: (_) => const FxScreen(),
+                  builder: (_) => const FxStrategistHubScreen(),
                 ),
               );
             },

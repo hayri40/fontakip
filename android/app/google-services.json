@@ -1,0 +1,47 @@
+{
+  "project_info": {
+    "project_number": "575790058034",
+    "project_id": "fonttakip",
+    "storage_bucket": "fonttakip.firebasestorage.app"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:575790058034:android:f9beda73535ca6f8540a2b",
+        "android_client_info": {
+          "package_name": "com.fontakip.app"
+        }
+      },
+      "oauth_client": [
+        {
+          "client_id": "575790058034-jc4qrisl3o71k5a9n5t37db5trp6tbqg.apps.googleusercontent.com",
+          "client_type": 1,
+          "android_info": {
+            "package_name": "com.fontakip.app",
+            "certificate_hash": "e799333f55008f1943a40172cf51559308a7235d"
+          }
+        },
+        {
+          "client_id": "575790058034-0h1s5c4bo7p8kislb3m7hedbbo6ue4v0.apps.googleusercontent.com",
+          "client_type": 3
+        }
+      ],
+      "api_key": [
+        {
+          "current_key": "AIzaSyAwO2YiapuJkq6IQfwIcpz2Djt5TlIzuww"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": [
+            {
+              "client_id": "575790058034-0h1s5c4bo7p8kislb3m7hedbbo6ue4v0.apps.googleusercontent.com",
+              "client_type": 3
+            }
+          ]
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}

@@ -1,6 +1,21 @@
 # Project-level configuration.
 cmake_minimum_required(VERSION 3.14)
+
+# PERMANENT FIX: Override the built-in cmake_minimum_required to prevent errors in subprojects (Firebase)
+# Newer CMake versions (3.27+) fail when they see "VERSION < 3.5" in sub-directories.
+# This macro intercepts subproject calls and ensures they satisfy the 3.5 minimum requirement.
+macro(cmake_minimum_required)
+  if("${ARGV1}" VERSION_LESS "3.5")
+    _cmake_minimum_required(VERSION 3.5)
+  else()
+    _cmake_minimum_required(${ARGV})
+  endif()
+endmacro()
+
 project(fontakip LANGUAGES CXX)
+add_compile_definitions(
+        _SILENCE_EXPERIMENTAL_COROUTINE_DEPRECATION_WARNINGS
+)
 
 # The name of the executable created for the application. Change this to change
 # the on-disk name of your application.
@@ -65,8 +80,8 @@ include(flutter/generated_plugins.cmake)
 set(BUILD_BUNDLE_DIR "$<TARGET_FILE_DIR:${BINARY_NAME}>")
 # Make the "install" step default, as it's required to run.
 set(CMAKE_VS_INCLUDE_INSTALL_TO_DEFAULT_BUILD 1)
-if(CMAKE_INSTALL_PREFIX_INITIALIZED_TO_DEFAULT)
-  set(CMAKE_INSTALL_PREFIX "${BUILD_BUNDLE_DIR}" CACHE PATH "..." FORCE)
+if(CMAKE_INSTALL_PREFIX_INITIALIZED_TO_DEFAULT OR CMAKE_INSTALL_PREFIX MATCHES "Program Files")
+  set(CMAKE_INSTALL_PREFIX "${BUILD_BUNDLE_DIR}" CACHE PATH "Install prefix" FORCE)
 endif()
 
 set(INSTALL_BUNDLE_DATA_DIR "${CMAKE_INSTALL_PREFIX}/data")

@@ -4,6 +4,7 @@ import 'dart:io';
 
 import 'package:flutter/services.dart';
 import 'package:google_sign_in/google_sign_in.dart';
+import 'package:firebase_auth/firebase_auth.dart';
 import 'package:http/http.dart' as http;
 import 'package:shared_preferences/shared_preferences.dart';
 
@@ -117,17 +118,40 @@ class GoogleCloudBackupService implements CloudBackupService {
   }
 
   Future<DriveUserSession?> _signInWithGoogle() async {
+    developer.log('Starting Google Sign-In...', name: 'ExpertDebug');
     final account = await _googleSignIn.signIn();
+    if (account != null) {
+      developer.log('Google Account received: ${account.email}. Fetching auth...', name: 'ExpertDebug');
+      final googleAuth = await account.authentication;
+      developer.log('Google Auth tokens received. Signing into Firebase...', name: 'ExpertDebug');
+      final credential = GoogleAuthProvider.credential(
+        accessToken: googleAuth.accessToken,
+        idToken: googleAuth.idToken,
+      );
+      final userCredential = await FirebaseAuth.instance.signInWithCredential(credential);
+      developer.log('Firebase Sign-In Success: ${userCredential.user?.uid}', name: 'ExpertDebug');
+    } else {
+      developer.log('Google Sign-In aborted by user.', name: 'ExpertDebug');
+    }
     return _mapGoogleAccount(account);
   }
 
   Future<DriveUserSession?> _signInSilentlyWithGoogle() async {
     final account = await _googleSignIn.signInSilently();
+    if (account != null) {
+      final googleAuth = await account.authentication;
+      final credential = GoogleAuthProvider.credential(
+        accessToken: googleAuth.accessToken,
+        idToken: googleAuth.idToken,
+      );
+      await FirebaseAuth.instance.signInWithCredential(credential);
+    }
     return _mapGoogleAccount(account);
   }
 
   Future<void> _signOutFromGoogle() async {
     await _googleSignIn.signOut();
+    await FirebaseAuth.instance.signOut();
   }
 
   @override
@@ -156,14 +180,18 @@ class GoogleCloudBackupService implements CloudBackupService {
       throw const CloudBackupException('İnternet bağlantısı bulunamadı');
     } catch (error, stackTrace) {
       developer.log(
-        'Google sign-in failed',
+        'CRITICAL: Google sign-in failed',
         name: 'GoogleCloudBackupService',
         error: error,
         stackTrace: stackTrace,
       );
+      // Hata detaylarını konsola bas
+      print('ExpertDebug Error Type: ${error.runtimeType}');
+      print('ExpertDebug Full Error: $error');
+      
       final state = const AuthState(isSignedIn: false, provider: _provider);
       await _persistAuthState(state);
-      throw CloudBackupException(_describeSignInError(error));
+      throw CloudBackupException(_describeSignInError(error) + ' | Detay: $error');
     }
   }
 

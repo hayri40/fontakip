@@ -1,10 +1,10 @@
 {
-  "version": "0.8.0-beta",
-  "releaseDate": "2026-08-25",
+  "version": "0.9.0",
+  "releaseDate": "2026-08-29",
   "notes": [
-    "TradeDesk AI: FX Baş Stratejisti ve Uzman Hafızası eklendi.",
-    "TradingView canlı grafikler hem Android hem Windows'ta aktif.",
-    "Firebase Firestore kural senkronizasyonu tamamlandı."
+    "TradeDesk AI: Watchlist ve Bulut Senkronizasyonu eklendi.",
+    "Android 14+ ve Windows uyumluluk güncellemeleri yapıldı.",
+    "Grafik çizimlerini otomatik kaydetme özelliği aktif."
   ],
-  "apkUrl": "https://github.com/hayri40/fontakip/releases/download/v0.8.0-beta/fontakip-0.8.0-beta.apk"
+  "apkUrl": "https://github.com/hayri40/fontakip/releases/download/v0.9.0/fontakip-v0.9.0.apk"
 }

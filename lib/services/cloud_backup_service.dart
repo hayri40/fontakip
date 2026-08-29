@@ -81,7 +81,7 @@ class GoogleCloudBackupService implements CloudBackupService {
              scopes: const [
                'email',
                'profile',
-               'https://www.googleapis.com/auth/drive.appdata',
+               _driveScope,
              ],
            ),
        _backupService = backupService ?? BackupService(),
@@ -120,37 +120,46 @@ class GoogleCloudBackupService implements CloudBackupService {
   }
 
   Future<DriveUserSession?> _signInWithGoogle() async {
-    developer.log('Starting Google Sign-In...', name: 'ExpertDebug');
-    // In google_sign_in 7.x, signIn() is still the correct method for interactive sign-in.
-    final account = await _googleSignIn.signIn();
-    
-    if (account != null) {
-      developer.log('Google Account received: ${account.email}. Fetching auth...', name: 'ExpertDebug');
-      final googleAuth = await account.authentication;
-      developer.log('Google Auth tokens received. Signing into Firebase...', name: 'ExpertDebug');
-      final credential = GoogleAuthProvider.credential(
-        accessToken: googleAuth.accessToken,
-        idToken: googleAuth.idToken,
-      );
-      final userCredential = await FirebaseAuth.instance.signInWithCredential(credential);
-      developer.log('Firebase Sign-In Success: ${userCredential.user?.uid}', name: 'ExpertDebug');
+    developer.log('Starting Google Sign-In (authenticate)...', name: 'ExpertDebug');
+    try {
+      // Use authenticate() which returns GoogleSignInAccount? in 7.x
+      final account = await _googleSignIn.authenticate();
+      
+      if (account != null) {
+        developer.log('Account received: ${account.email}. Fetching Firebase auth...', name: 'ExpertDebug');
+        final googleAuth = await account.authentication;
+        final credential = GoogleAuthProvider.credential(
+          accessToken: googleAuth.accessToken,
+          idToken: googleAuth.idToken,
+        );
+        final userCredential = await FirebaseAuth.instance.signInWithCredential(credential);
+        developer.log('Firebase Sign-In Success: ${userCredential.user?.uid}', name: 'ExpertDebug');
+      }
+      return _mapGoogleAccount(account);
+    } catch (e) {
+      developer.log('Error during Google Sign-In: $e', name: 'ExpertDebug');
+      return null;
     }
-    return _mapGoogleAccount(account);
   }
 
   Future<DriveUserSession?> _signInSilentlyWithGoogle() async {
-    // In google_sign_in 7.x, signInSilently() is the correct method for silent sign-in.
-    final account = await _googleSignIn.signInSilently();
-    
-    if (account != null) {
-      final googleAuth = await account.authentication;
-      final credential = GoogleAuthProvider.credential(
-        accessToken: googleAuth.accessToken,
-        idToken: googleAuth.idToken,
-      );
-      await FirebaseAuth.instance.signInWithCredential(credential);
+    try {
+      // Use attemptLightweightAuthentication() which returns GoogleSignInAccount? in 7.x
+      final account = await _googleSignIn.attemptLightweightAuthentication();
+      
+      if (account != null) {
+        final googleAuth = await account.authentication;
+        final credential = GoogleAuthProvider.credential(
+          accessToken: googleAuth.accessToken,
+          idToken: googleAuth.idToken,
+        );
+        await FirebaseAuth.instance.signInWithCredential(credential);
+      }
+      return _mapGoogleAccount(account);
+    } catch (e) {
+      developer.log('Error during silent Google Sign-In: $e', name: 'ExpertDebug');
+      return null;
     }
-    return _mapGoogleAccount(account);
   }
 
   Future<void> _signOutFromGoogle() async {

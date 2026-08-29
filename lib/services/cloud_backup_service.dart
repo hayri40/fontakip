@@ -76,13 +76,16 @@ class GoogleCloudBackupService implements CloudBackupService {
     Future<DriveUserSession?> Function()? interactiveSignIn,
     Future<DriveUserSession?> Function()? silentSignIn,
     Future<void> Function()? signOutAction,
-  }) : _googleSignIn = googleSignIn ?? GoogleSignIn(scopes: const ['email', 'profile', _driveScope]),
+  }) : _googleSignIn = googleSignIn ?? GoogleSignIn.instance,
        _backupService = backupService ?? BackupService(),
        _httpClient = httpClient ?? http.Client(),
        _prefsFuture = prefsFuture ?? SharedPreferences.getInstance() {
     _interactiveSignIn = interactiveSignIn ?? _signInWithGoogle;
     _silentSignIn = silentSignIn ?? _signInSilentlyWithGoogle;
     _signOutAction = signOutAction ?? _signOutFromGoogle;
+
+    // Initialize with mandatory scopes
+    _googleSignIn.initialize(scopes: const ['email', 'profile', _driveScope]);
   }
 
   @override
@@ -114,7 +117,10 @@ class GoogleCloudBackupService implements CloudBackupService {
 
   Future<DriveUserSession?> _signInWithGoogle() async {
     developer.log('Starting Google Sign-In...', name: 'ExpertDebug');
-    final account = await _googleSignIn.signIn();
+    // google_sign_in 7.x uses authenticate() instead of signIn()
+    await _googleSignIn.authenticate();
+    final account = _googleSignIn.currentUser;
+    
     if (account != null) {
       developer.log('Google Account received: ${account.email}. Fetching auth...', name: 'ExpertDebug');
       final googleAuth = await account.authentication;
@@ -130,7 +136,10 @@ class GoogleCloudBackupService implements CloudBackupService {
   }
 
   Future<DriveUserSession?> _signInSilentlyWithGoogle() async {
-    final account = await _googleSignIn.signInSilently();
+    // google_sign_in 7.x uses attemptLightweightAuthentication() instead of signInSilently()
+    await _googleSignIn.attemptLightweightAuthentication();
+    final account = _googleSignIn.currentUser;
+    
     if (account != null) {
       final googleAuth = await account.authentication;
       final credential = GoogleAuthProvider.credential(

@@ -81,7 +81,7 @@ class GoogleCloudBackupService implements CloudBackupService {
              scopes: const [
                'email',
                'profile',
-               'https://www.googleapis.com/auth/drive.appdata',
+               _driveScope,
              ],
            ),
        _backupService = backupService ?? BackupService(),
@@ -111,7 +111,7 @@ class GoogleCloudBackupService implements CloudBackupService {
         photoUrl: account.photoUrl,
       ),
       authHeadersProvider: () async {
-        // Use dynamic to bypass static analysis error on accessToken
+        // ULTIMATE FIX: Total dynamic casting to bypass library export visibility issues in 7.x
         final dynamic auth = await account.authentication;
         return {
           'Authorization': 'Bearer ${auth.accessToken}',
@@ -127,7 +127,6 @@ class GoogleCloudBackupService implements CloudBackupService {
       
       if (account != null) {
         developer.log('Account received: ${account.email}. Fetching Firebase auth...', name: 'ExpertDebug');
-        // Use dynamic to bypass static analysis error on accessToken/idToken
         final dynamic googleAuth = await account.authentication;
         final credential = GoogleAuthProvider.credential(
           accessToken: googleAuth.accessToken,
@@ -148,7 +147,6 @@ class GoogleCloudBackupService implements CloudBackupService {
       final account = await _googleSignIn.signInSilently();
       
       if (account != null) {
-        // Use dynamic to bypass static analysis error on accessToken/idToken
         final dynamic googleAuth = await account.authentication;
         final credential = GoogleAuthProvider.credential(
           accessToken: googleAuth.accessToken,

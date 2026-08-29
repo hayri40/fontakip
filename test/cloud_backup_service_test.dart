@@ -79,8 +79,6 @@ void main() {
       }),
       interactiveSignIn: () async => buildSession(),
       silentSignIn: () async => buildSession(),
-      canAccessScopes: (_) async => true,
-      requestScopes: (_) async => true,
     );
 
     final info = await service.uploadBackup();
@@ -126,8 +124,6 @@ void main() {
         }),
         interactiveSignIn: () async => buildSession(),
         silentSignIn: () async => buildSession(),
-        canAccessScopes: (_) => Future<bool>.error(UnimplementedError()),
-        requestScopes: (_) async => true,
       );
 
       final info = await service.uploadBackup();
@@ -160,8 +156,6 @@ void main() {
       }),
       interactiveSignIn: () async => buildSession(),
       silentSignIn: () async => buildSession(),
-      canAccessScopes: (_) async => true,
-      requestScopes: (_) async => true,
     );
 
     final restoreData = await service.downloadBackup();
@@ -179,8 +173,6 @@ void main() {
       httpClient: MockClient((request) async => http.Response('{}', 200)),
       interactiveSignIn: () async => buildSession(),
       silentSignIn: () async => buildSession(),
-      canAccessScopes: (_) async => true,
-      requestScopes: (_) async => true,
     );
 
     await service.restoreBackupData('{"database":{},"sharedPreferences":{}}');
@@ -199,8 +191,6 @@ void main() {
         throw Exception('drive scope consent failed');
       },
       silentSignIn: () async => null,
-      canAccessScopes: (_) async => true,
-      requestScopes: (_) async => true,
     );
 
     await expectLater(
@@ -238,8 +228,6 @@ void main() {
       httpClient: MockClient((request) async => http.Response('{}', 200)),
       interactiveSignIn: () async => buildSession(),
       silentSignIn: () async => buildSession(),
-      canAccessScopes: (_) async => true,
-      requestScopes: (_) async => true,
     );
 
     await service.signIn();

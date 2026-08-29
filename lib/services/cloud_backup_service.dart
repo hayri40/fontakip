@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'dart:convert';
 import 'dart:developer' as developer;
 import 'dart:io';
@@ -59,14 +60,18 @@ class GoogleCloudBackupService implements CloudBackupService {
 
   AuthState? _cachedState;
   CloudBackupInfo? _cachedBackupInfo;
+  GoogleSignInAccount? _currentUser;
 
   final GoogleSignIn _googleSignIn;
   final BackupService _backupService;
   final http.Client _httpClient;
   final Future<SharedPreferences> _prefsFuture;
+  
   late final Future<DriveUserSession?> Function() _interactiveSignIn;
   late final Future<DriveUserSession?> Function() _silentSignIn;
   late final Future<void> Function() _signOutAction;
+  late final Future<bool> Function(List<String> scopes) _canAccessScopes;
+  late final Future<bool> Function(List<String> scopes) _requestScopes;
 
   GoogleCloudBackupService({
     GoogleSignIn? googleSignIn,
@@ -76,24 +81,46 @@ class GoogleCloudBackupService implements CloudBackupService {
     Future<DriveUserSession?> Function()? interactiveSignIn,
     Future<DriveUserSession?> Function()? silentSignIn,
     Future<void> Function()? signOutAction,
-  }) : _googleSignIn = googleSignIn ??
-           GoogleSignIn(
-             scopes: const [
-               'email',
-               'profile',
-               _driveScope,
-             ],
-           ),
+    Future<bool> Function(List<String> scopes)? canAccessScopes,
+    Future<bool> Function(List<String> scopes)? requestScopes,
+  }) : _googleSignIn = googleSignIn ?? GoogleSignIn.instance,
        _backupService = backupService ?? BackupService(),
        _httpClient = httpClient ?? http.Client(),
        _prefsFuture = prefsFuture ?? SharedPreferences.getInstance() {
     _interactiveSignIn = interactiveSignIn ?? _signInWithGoogle;
     _silentSignIn = silentSignIn ?? _signInSilentlyWithGoogle;
     _signOutAction = signOutAction ?? _signOutFromGoogle;
+    
+    _canAccessScopes = canAccessScopes ?? (scopes) async {
+      final user = _currentUser;
+      if (user == null) return false;
+      final auth = await user.authorizationClient.authorizationForScopes(scopes);
+      return auth != null;
+    };
+    
+    _requestScopes = requestScopes ?? (scopes) async {
+      final user = _currentUser;
+      if (user == null) return false;
+      try {
+        await user.authorizationClient.authorizeScopes(scopes);
+        return true;
+      } catch (_) {
+        return false;
+      }
+    };
+
+    // Listen for auth events to keep _currentUser in sync
+    _googleSignIn.authenticationEvents.listen((event) {
+      if (event is GoogleSignInAuthenticationEventSignIn) {
+        _currentUser = event.user;
+      } else if (event is GoogleSignInAuthenticationEventSignOut) {
+        _currentUser = null;
+      }
+    });
   }
 
   @override
-  bool get isSignedIn => _cachedState?.isSignedIn ?? false;
+  bool get isSignedIn => _currentUser != null || (_cachedState?.isSignedIn ?? false);
 
   static DriveUserSession? _mapGoogleAccount(GoogleSignInAccount? account) {
     if (account == null) {
@@ -111,8 +138,7 @@ class GoogleCloudBackupService implements CloudBackupService {
         photoUrl: account.photoUrl,
       ),
       authHeadersProvider: () async {
-        // ULTIMATE FIX: Total dynamic casting to bypass library export visibility issues in 7.x
-        final dynamic auth = await account.authentication;
+        final auth = await account.authorizationClient.authorizeScopes([_driveScope]);
         return {
           'Authorization': 'Bearer ${auth.accessToken}',
         };
@@ -123,47 +149,44 @@ class GoogleCloudBackupService implements CloudBackupService {
   Future<DriveUserSession?> _signInWithGoogle() async {
     developer.log('Starting Google Sign-In...', name: 'ExpertDebug');
     try {
-      final account = await _googleSignIn.signIn();
+      final account = await _googleSignIn.authenticate();
+      _currentUser = account;
       
-      if (account != null) {
-        developer.log('Account received: ${account.email}. Fetching Firebase auth...', name: 'ExpertDebug');
-        final dynamic googleAuth = await account.authentication;
-        final credential = GoogleAuthProvider.credential(
-          accessToken: googleAuth.accessToken,
-          idToken: googleAuth.idToken,
-        );
-        final userCredential = await FirebaseAuth.instance.signInWithCredential(credential);
-        developer.log('Firebase Sign-In Success: ${userCredential.user?.uid}', name: 'ExpertDebug');
-      }
+      developer.log('Google Account received: ${account.email}. Fetching auth...', name: 'ExpertDebug');
+      final googleAuth = await account.authentication;
+      developer.log('Google Auth tokens received. Signing into Firebase...', name: 'ExpertDebug');
+      final credential = GoogleAuthProvider.credential(
+        accessToken: null, // Access token is for Drive, not needed for basic Firebase auth with idToken
+        idToken: googleAuth.idToken,
+      );
+      final userCredential = await FirebaseAuth.instance.signInWithCredential(credential);
+      developer.log('Firebase Sign-In Success: ${userCredential.user?.uid}', name: 'ExpertDebug');
+      
       return _mapGoogleAccount(account);
     } catch (e) {
-      developer.log('Error during Google Sign-In: $e', name: 'ExpertDebug');
+      developer.log('Google Sign-In failed: $e', name: 'ExpertDebug');
       return null;
     }
   }
 
   Future<DriveUserSession?> _signInSilentlyWithGoogle() async {
-    try {
-      final account = await _googleSignIn.signInSilently();
-      
-      if (account != null) {
-        final dynamic googleAuth = await account.authentication;
-        final credential = GoogleAuthProvider.credential(
-          accessToken: googleAuth.accessToken,
-          idToken: googleAuth.idToken,
-        );
-        await FirebaseAuth.instance.signInWithCredential(credential);
-      }
-      return _mapGoogleAccount(account);
-    } catch (e) {
-      developer.log('Error during silent Google Sign-In: $e', name: 'ExpertDebug');
-      return null;
+    final account = await _googleSignIn.attemptLightweightAuthentication();
+    if (account != null) {
+      _currentUser = account;
+      final googleAuth = await account.authentication;
+      final credential = GoogleAuthProvider.credential(
+        accessToken: null,
+        idToken: googleAuth.idToken,
+      );
+      await FirebaseAuth.instance.signInWithCredential(credential);
     }
+    return _mapGoogleAccount(account);
   }
 
   Future<void> _signOutFromGoogle() async {
     await _googleSignIn.signOut();
     await FirebaseAuth.instance.signOut();
+    _currentUser = null;
   }
 
   @override
@@ -230,11 +253,12 @@ class GoogleCloudBackupService implements CloudBackupService {
   @override
   Future<CloudBackupInfo> uploadBackup() async {
     final session = await _requireSession();
-    final authHeaders = await _authorizedHeaders(session);
-    final existing = await _findLatestBackup(authHeaders: authHeaders);
+    final existing = await _findLatestBackup(
+      authHeaders: await _authorizedHeaders(session),
+    );
     final jsonBody = await _backupService.createBackupJson();
     final uploadedFile = await _uploadBackupFile(
-      authHeaders: authHeaders,
+      authHeaders: await _authorizedHeaders(session),
       jsonBody: jsonBody,
       existingFileId: existing?.id,
     );
@@ -372,9 +396,11 @@ class GoogleCloudBackupService implements CloudBackupService {
         _cachedBackupInfo = baseInfo;
         return baseInfo;
       }
+      await _ensureDriveScopeGranted();
 
-      final authHeaders = await _authorizedHeaders(session);
-      final backupFile = await _findLatestBackup(authHeaders: authHeaders);
+      final backupFile = await _findLatestBackup(
+        authHeaders: await _authorizedHeaders(session),
+      );
       final info = _buildSignedInInfo(
         user: session.user,
         hasBackup: backupFile != null,
@@ -420,6 +446,8 @@ class GoogleCloudBackupService implements CloudBackupService {
       if (session == null) {
         throw const CloudBackupException('Google hesabı ile giriş yapın');
       }
+      await _ensureDriveScopeGranted();
+
       return session;
     } on CloudBackupException {
       rethrow;
@@ -433,6 +461,36 @@ class GoogleCloudBackupService implements CloudBackupService {
         stackTrace: stackTrace,
       );
       throw const CloudBackupException('Google hesabı ile tekrar giriş yapın');
+    }
+  }
+
+  Future<void> _ensureDriveScopeGranted() async {
+    try {
+      final hasDriveScope = await _canAccessScopes(const [_driveScope]);
+      if (hasDriveScope) {
+        return;
+      }
+
+      final granted = await _requestScopes(const [_driveScope]);
+      if (!granted) {
+        throw const CloudBackupException(
+          'Google Drive yedekleme izni verilmedi',
+        );
+      }
+    } on CloudBackupException {
+      rethrow;
+    } on SocketException {
+      throw const CloudBackupException('İnternet bağlantısı bulunamadı');
+    } catch (error, stackTrace) {
+      developer.log(
+        'Failed to acquire Drive AppData scope',
+        name: 'GoogleCloudBackupService',
+        error: error,
+        stackTrace: stackTrace,
+      );
+      throw CloudBackupException(
+        'Google Drive izni alınamadı: ${_describeSignInError(error)}',
+      );
     }
   }
 

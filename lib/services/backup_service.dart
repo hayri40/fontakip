@@ -67,17 +67,16 @@ class BackupService {
   }
 
   Future<bool> importBackup() async {
-    final picked = await FilePicker.instance.pickFiles(
+    final picked = await FilePicker.pickFiles(
       dialogTitle: 'Yedek dosyasını seç',
       type: FileType.custom,
       allowedExtensions: const ['json'],
-      allowMultiple: false,
     );
-    if (picked == null || picked.files.isEmpty) {
+    if (picked.isEmpty) {
       return false;
     }
 
-    final selectedPath = picked.files.single.path;
+    final selectedPath = picked.first.path;
     if (selectedPath == null || selectedPath.trim().isEmpty) {
       return false;
     }

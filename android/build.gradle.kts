@@ -20,33 +20,33 @@ subprojects {
 }
 
 subprojects {
-    val project = this
-    fun applyProguardFix() {
-        if (project.extensions.findByName("android") != null) {
-            project.configure<com.android.build.gradle.BaseExtension> {
-                buildTypes.forEach { buildType ->
-                    val currentFiles = buildType.proguardFiles
-                    val newFiles = currentFiles.map { file ->
-                        if (file.name == "proguard-android.txt") {
-                            getDefaultProguardFile("proguard-android-optimize.txt")
-                        } else {
-                            file
-                        }
-                    }
-                    buildType.setProguardFiles(newFiles)
+    // Securely hook into Android plugins without lifecycle errors
+    plugins.withId("com.android.library") {
+        applyProguardFix(this@subprojects)
+    }
+    plugins.withId("com.android.application") {
+        applyProguardFix(this@subprojects)
+    }
+}
+
+fun applyProguardFix(project: Project) {
+    project.configure<com.android.build.gradle.BaseExtension> {
+        buildTypes.all {
+            val currentFiles = proguardFiles
+            val newFiles = currentFiles.map { file ->
+                if (file.name == "proguard-android.txt") {
+                    project.android.getDefaultProguardFile("proguard-android-optimize.txt")
+                } else {
+                    file
                 }
             }
-        }
-    }
-
-    if (project.state.executed) {
-        applyProguardFix()
-    } else {
-        project.afterEvaluate {
-            applyProguardFix()
+            setProguardFiles(newFiles)
         }
     }
 }
+
+val Project.android: com.android.build.gradle.BaseExtension
+    get() = extensions.getByType<com.android.build.gradle.BaseExtension>()
 
 tasks.register<Delete>("clean") {
     delete(rootProject.layout.buildDirectory)

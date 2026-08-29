@@ -20,12 +20,11 @@ subprojects {
 }
 
 subprojects {
-    afterEvaluate {
-        if (extensions.findByName("android") != null) {
-            configure<com.android.build.gradle.BaseExtension> {
+    val project = this
+    fun applyProguardFix() {
+        if (project.extensions.findByName("android") != null) {
+            project.configure<com.android.build.gradle.BaseExtension> {
                 buildTypes.forEach { buildType ->
-                    // Force the use of the optimized proguard file instead of the legacy one
-                    // which is no longer supported in AGP 8.0+
                     val currentFiles = buildType.proguardFiles
                     val newFiles = currentFiles.map { file ->
                         if (file.name == "proguard-android.txt") {
@@ -37,6 +36,14 @@ subprojects {
                     buildType.setProguardFiles(newFiles)
                 }
             }
+        }
+    }
+
+    if (project.state.executed) {
+        applyProguardFix()
+    } else {
+        project.afterEvaluate {
+            applyProguardFix()
         }
     }
 }

@@ -67,12 +67,6 @@ class GoogleCloudBackupService implements CloudBackupService {
   late final Future<DriveUserSession?> Function() _interactiveSignIn;
   late final Future<DriveUserSession?> Function() _silentSignIn;
   late final Future<void> Function() _signOutAction;
-  late final Future<bool> Function(List<String> scopes) _canAccessScopes;
-  late final Future<bool> Function(List<String> scopes) _requestScopes;
-
-  static GoogleSignIn _createGoogleSignIn() {
-    return GoogleSignIn(scopes: const ['email', 'profile']);
-  }
 
   GoogleCloudBackupService({
     GoogleSignIn? googleSignIn,
@@ -82,17 +76,13 @@ class GoogleCloudBackupService implements CloudBackupService {
     Future<DriveUserSession?> Function()? interactiveSignIn,
     Future<DriveUserSession?> Function()? silentSignIn,
     Future<void> Function()? signOutAction,
-    Future<bool> Function(List<String> scopes)? canAccessScopes,
-    Future<bool> Function(List<String> scopes)? requestScopes,
-  }) : _googleSignIn = googleSignIn ?? _createGoogleSignIn(),
+  }) : _googleSignIn = googleSignIn ?? GoogleSignIn(scopes: const ['email', 'profile', _driveScope]),
        _backupService = backupService ?? BackupService(),
        _httpClient = httpClient ?? http.Client(),
        _prefsFuture = prefsFuture ?? SharedPreferences.getInstance() {
     _interactiveSignIn = interactiveSignIn ?? _signInWithGoogle;
     _silentSignIn = silentSignIn ?? _signInSilentlyWithGoogle;
     _signOutAction = signOutAction ?? _signOutFromGoogle;
-    _canAccessScopes = canAccessScopes ?? _googleSignIn.canAccessScopes;
-    _requestScopes = requestScopes ?? _googleSignIn.requestScopes;
   }
 
   @override
@@ -113,7 +103,12 @@ class GoogleCloudBackupService implements CloudBackupService {
         displayName: account.displayName,
         photoUrl: account.photoUrl,
       ),
-      authHeadersProvider: () => account.authHeaders,
+      authHeadersProvider: () async {
+        final auth = await account.authentication;
+        return {
+          'Authorization': 'Bearer ${auth.accessToken}',
+        };
+      },
     );
   }
 
@@ -130,8 +125,6 @@ class GoogleCloudBackupService implements CloudBackupService {
       );
       final userCredential = await FirebaseAuth.instance.signInWithCredential(credential);
       developer.log('Firebase Sign-In Success: ${userCredential.user?.uid}', name: 'ExpertDebug');
-    } else {
-      developer.log('Google Sign-In aborted by user.', name: 'ExpertDebug');
     }
     return _mapGoogleAccount(account);
   }
@@ -185,13 +178,9 @@ class GoogleCloudBackupService implements CloudBackupService {
         error: error,
         stackTrace: stackTrace,
       );
-      // Hata detaylarını konsola bas
-      print('ExpertDebug Error Type: ${error.runtimeType}');
-      print('ExpertDebug Full Error: $error');
-      
       final state = const AuthState(isSignedIn: false, provider: _provider);
       await _persistAuthState(state);
-      throw CloudBackupException(_describeSignInError(error) + ' | Detay: $error');
+      throw CloudBackupException(_describeSignInError(error));
     }
   }
 
@@ -222,12 +211,11 @@ class GoogleCloudBackupService implements CloudBackupService {
   @override
   Future<CloudBackupInfo> uploadBackup() async {
     final session = await _requireSession();
-    final existing = await _findLatestBackup(
-      authHeaders: await _authorizedHeaders(session),
-    );
+    final authHeaders = await _authorizedHeaders(session);
+    final existing = await _findLatestBackup(authHeaders: authHeaders);
     final jsonBody = await _backupService.createBackupJson();
     final uploadedFile = await _uploadBackupFile(
-      authHeaders: await _authorizedHeaders(session),
+      authHeaders: authHeaders,
       jsonBody: jsonBody,
       existingFileId: existing?.id,
     );
@@ -365,11 +353,9 @@ class GoogleCloudBackupService implements CloudBackupService {
         _cachedBackupInfo = baseInfo;
         return baseInfo;
       }
-      await _ensureDriveScopeGranted();
 
-      final backupFile = await _findLatestBackup(
-        authHeaders: await _authorizedHeaders(session),
-      );
+      final authHeaders = await _authorizedHeaders(session);
+      final backupFile = await _findLatestBackup(authHeaders: authHeaders);
       final info = _buildSignedInInfo(
         user: session.user,
         hasBackup: backupFile != null,
@@ -415,8 +401,6 @@ class GoogleCloudBackupService implements CloudBackupService {
       if (session == null) {
         throw const CloudBackupException('Google hesabı ile giriş yapın');
       }
-      await _ensureDriveScopeGranted();
-
       return session;
     } on CloudBackupException {
       rethrow;
@@ -430,46 +414,6 @@ class GoogleCloudBackupService implements CloudBackupService {
         stackTrace: stackTrace,
       );
       throw const CloudBackupException('Google hesabı ile tekrar giriş yapın');
-    }
-  }
-
-  Future<void> _ensureDriveScopeGranted() async {
-    try {
-      bool hasDriveScope = false;
-      try {
-        hasDriveScope = await _canAccessScopes(const [_driveScope]);
-      } on UnimplementedError catch (error, stackTrace) {
-        developer.log(
-          'canAccessScopes is not implemented on this platform; falling back to requestScopes',
-          name: 'GoogleCloudBackupService',
-          error: error,
-          stackTrace: stackTrace,
-        );
-      }
-      if (hasDriveScope) {
-        return;
-      }
-
-      final granted = await _requestScopes(const [_driveScope]);
-      if (!granted) {
-        throw const CloudBackupException(
-          'Google Drive yedekleme izni verilmedi',
-        );
-      }
-    } on CloudBackupException {
-      rethrow;
-    } on SocketException {
-      throw const CloudBackupException('İnternet bağlantısı bulunamadı');
-    } catch (error, stackTrace) {
-      developer.log(
-        'Failed to acquire Drive AppData scope',
-        name: 'GoogleCloudBackupService',
-        error: error,
-        stackTrace: stackTrace,
-      );
-      throw CloudBackupException(
-        'Google Drive izni alınamadı: ${_describeSignInError(error)}',
-      );
     }
   }
 

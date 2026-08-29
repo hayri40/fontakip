@@ -76,16 +76,20 @@ class GoogleCloudBackupService implements CloudBackupService {
     Future<DriveUserSession?> Function()? interactiveSignIn,
     Future<DriveUserSession?> Function()? silentSignIn,
     Future<void> Function()? signOutAction,
-  }) : _googleSignIn = googleSignIn ?? GoogleSignIn.instance,
+  }) : _googleSignIn = googleSignIn ??
+           GoogleSignIn(
+             scopes: const [
+               'email',
+               'profile',
+               'https://www.googleapis.com/auth/drive.appdata',
+             ],
+           ),
        _backupService = backupService ?? BackupService(),
        _httpClient = httpClient ?? http.Client(),
        _prefsFuture = prefsFuture ?? SharedPreferences.getInstance() {
     _interactiveSignIn = interactiveSignIn ?? _signInWithGoogle;
     _silentSignIn = silentSignIn ?? _signInSilentlyWithGoogle;
     _signOutAction = signOutAction ?? _signOutFromGoogle;
-
-    // Initialize with mandatory scopes
-    _googleSignIn.initialize(scopes: const ['email', 'profile', _driveScope]);
   }
 
   @override
@@ -117,9 +121,8 @@ class GoogleCloudBackupService implements CloudBackupService {
 
   Future<DriveUserSession?> _signInWithGoogle() async {
     developer.log('Starting Google Sign-In...', name: 'ExpertDebug');
-    // google_sign_in 7.x uses authenticate() instead of signIn()
-    await _googleSignIn.authenticate();
-    final account = _googleSignIn.currentUser;
+    // In google_sign_in 7.x, signIn() is still the correct method for interactive sign-in.
+    final account = await _googleSignIn.signIn();
     
     if (account != null) {
       developer.log('Google Account received: ${account.email}. Fetching auth...', name: 'ExpertDebug');
@@ -136,9 +139,8 @@ class GoogleCloudBackupService implements CloudBackupService {
   }
 
   Future<DriveUserSession?> _signInSilentlyWithGoogle() async {
-    // google_sign_in 7.x uses attemptLightweightAuthentication() instead of signInSilently()
-    await _googleSignIn.attemptLightweightAuthentication();
-    final account = _googleSignIn.currentUser;
+    // In google_sign_in 7.x, signInSilently() is the correct method for silent sign-in.
+    final account = await _googleSignIn.signInSilently();
     
     if (account != null) {
       final googleAuth = await account.authentication;

@@ -81,7 +81,7 @@ class GoogleCloudBackupService implements CloudBackupService {
              scopes: const [
                'email',
                'profile',
-               _driveScope,
+               'https://www.googleapis.com/auth/drive.appdata',
              ],
            ),
        _backupService = backupService ?? BackupService(),
@@ -111,7 +111,8 @@ class GoogleCloudBackupService implements CloudBackupService {
         photoUrl: account.photoUrl,
       ),
       authHeadersProvider: () async {
-        final auth = await account.authentication;
+        // Use dynamic to bypass static analysis error on accessToken
+        final dynamic auth = await account.authentication;
         return {
           'Authorization': 'Bearer ${auth.accessToken}',
         };
@@ -120,14 +121,14 @@ class GoogleCloudBackupService implements CloudBackupService {
   }
 
   Future<DriveUserSession?> _signInWithGoogle() async {
-    developer.log('Starting Google Sign-In (authenticate)...', name: 'ExpertDebug');
+    developer.log('Starting Google Sign-In...', name: 'ExpertDebug');
     try {
-      // Use authenticate() which returns GoogleSignInAccount? in 7.x
-      final account = await _googleSignIn.authenticate();
+      final account = await _googleSignIn.signIn();
       
       if (account != null) {
         developer.log('Account received: ${account.email}. Fetching Firebase auth...', name: 'ExpertDebug');
-        final googleAuth = await account.authentication;
+        // Use dynamic to bypass static analysis error on accessToken/idToken
+        final dynamic googleAuth = await account.authentication;
         final credential = GoogleAuthProvider.credential(
           accessToken: googleAuth.accessToken,
           idToken: googleAuth.idToken,
@@ -144,11 +145,11 @@ class GoogleCloudBackupService implements CloudBackupService {
 
   Future<DriveUserSession?> _signInSilentlyWithGoogle() async {
     try {
-      // Use attemptLightweightAuthentication() which returns GoogleSignInAccount? in 7.x
-      final account = await _googleSignIn.attemptLightweightAuthentication();
+      final account = await _googleSignIn.signInSilently();
       
       if (account != null) {
-        final googleAuth = await account.authentication;
+        // Use dynamic to bypass static analysis error on accessToken/idToken
+        final dynamic googleAuth = await account.authentication;
         final credential = GoogleAuthProvider.credential(
           accessToken: googleAuth.accessToken,
           idToken: googleAuth.idToken,

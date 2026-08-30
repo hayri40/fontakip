@@ -70,8 +70,6 @@ class GoogleCloudBackupService implements CloudBackupService {
   late final Future<DriveUserSession?> Function() _interactiveSignIn;
   late final Future<DriveUserSession?> Function() _silentSignIn;
   late final Future<void> Function() _signOutAction;
-  late final Future<bool> Function(List<String> scopes) _canAccessScopes;
-  late final Future<bool> Function(List<String> scopes) _requestScopes;
 
   GoogleCloudBackupService({
     GoogleSignIn? googleSignIn,
@@ -90,27 +88,6 @@ class GoogleCloudBackupService implements CloudBackupService {
     _interactiveSignIn = interactiveSignIn ?? _signInWithGoogle;
     _silentSignIn = silentSignIn ?? _silentSignInAction;
     _signOutAction = signOutAction ?? _signOutFromGoogle;
-    
-    _canAccessScopes = canAccessScopes ?? (scopes) async {
-      final user = _currentUser;
-      if (user == null) return false;
-      final auth = await user.authorizationClient.authorizationForScopes(scopes);
-      return auth != null;
-    };
-    
-    _requestScopes = requestScopes ?? (scopes) async {
-      final user = _currentUser;
-      if (user == null) return false;
-      try {
-        await user.authorizationClient.authorizeScopes(scopes);
-        return true;
-      } catch (_) {
-        return false;
-      }
-    };
-
-    // Initialize without passing 'scopes' as it's not a named parameter
-    _googleSignIn.initialize();
 
     // Listen for auth events to keep _currentUser in sync
     _googleSignIn.authenticationEvents.listen((event) {
@@ -152,8 +129,11 @@ class GoogleCloudBackupService implements CloudBackupService {
   Future<DriveUserSession?> _signInWithGoogle() async {
     developer.log('Starting Google Sign-In...', name: 'ExpertDebug');
     try {
-      // Version 7.2.0 uses authenticate() for interactive sign-in
       final account = await _googleSignIn.authenticate();
+      if (account == null) {
+        developer.log('Google Sign-In aborted by user or returned null.', name: 'ExpertDebug');
+        return null;
+      }
       _currentUser = account;
       
       developer.log('Google Account received: ${account.email}. Fetching auth...', name: 'ExpertDebug');
@@ -169,13 +149,12 @@ class GoogleCloudBackupService implements CloudBackupService {
       return _mapGoogleAccount(account);
     } catch (e) {
       developer.log('CRITICAL: _signInWithGoogle exception: $e', name: 'ExpertDebug');
-      rethrow; 
+      rethrow; // Re-throw to be caught by signIn()
     }
   }
 
   Future<DriveUserSession?> _silentSignInAction() async {
     try {
-      // Version 7.2.0 uses attemptLightweightAuthentication() for silent sign-in
       final account = await _googleSignIn.attemptLightweightAuthentication();
       if (account != null) {
         _currentUser = account;
@@ -330,6 +309,10 @@ class GoogleCloudBackupService implements CloudBackupService {
 
   @override
   Future<AuthState> getAuthState() async {
+    if (_currentUser != null) {
+      return _buildAuthState(_mapGoogleAccount(_currentUser!)!.user);
+    }
+    
     if (_cachedState != null) {
       return _cachedState!;
     }
@@ -343,7 +326,7 @@ class GoogleCloudBackupService implements CloudBackupService {
       }
     } catch (error, stackTrace) {
       developer.log(
-        'Silent sign-in failed',
+        'Silent sign-in failed during getAuthState',
         name: 'GoogleCloudBackupService',
         error: error,
         stackTrace: stackTrace,
@@ -398,7 +381,13 @@ class GoogleCloudBackupService implements CloudBackupService {
     }
 
     try {
-      final session = await _silentSignIn();
+      DriveUserSession? session;
+      if (_currentUser != null) {
+        session = _mapGoogleAccount(_currentUser);
+      } else {
+        session = await _silentSignIn();
+      }
+
       if (session == null) {
         _cachedBackupInfo = baseInfo;
         return baseInfo;
@@ -472,13 +461,16 @@ class GoogleCloudBackupService implements CloudBackupService {
 
   Future<void> _ensureDriveScopeGranted() async {
     try {
-      final hasDriveScope = await _canAccessScopes(const [_driveScope]);
-      if (hasDriveScope) {
+      // In 7.2.0, use authorizationClient.authorizationForScopes to check
+      final user = _currentUser;
+      if (user == null) return;
+      final auth = await user.authorizationClient.authorizationForScopes([_driveScope]);
+      if (auth != null) {
         return;
       }
 
-      final granted = await _requestScopes(const [_driveScope]);
-      if (!granted) {
+      final authResult = await user.authorizationClient.authorizeScopes([_driveScope]);
+      if (authResult.accessToken.isEmpty) {
         throw const CloudBackupException(
           'Google Drive yedekleme izni verilmedi',
         );

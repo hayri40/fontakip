@@ -48,6 +48,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
   late final EmailSummaryPreferencesService _emailSummaryPreferencesService;
   late final UpdateDownloadService _updateDownloadService;
   bool _busy = false;
+  bool _cloudInitialLoading = true; // New state for initial sync
   bool _emailPreferencesBusy = false;
   bool _emailPreferencesLoaded = false;
   bool _checkingUpdates = false;
@@ -135,6 +136,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
       _cloudBackupInfo = cloudBackupInfo;
       _emailSummaryPreferences = emailSummaryPreferences;
       _emailPreferencesLoaded = true;
+      _cloudInitialLoading = false; // Sync finished
     });
   }
 
@@ -1371,7 +1373,20 @@ class _SettingsScreenState extends State<SettingsScreen> {
                     ),
                   ],
                   const SizedBox(height: 16),
-                  if (_cloudAuthState.isSignedIn) ...[
+                  if (_cloudInitialLoading)
+                    const Center(
+                      child: Padding(
+                        padding: EdgeInsets.symmetric(vertical: 20),
+                        child: Column(
+                          children: [
+                            CircularProgressIndicator(strokeWidth: 2),
+                            SizedBox(height: 8),
+                            Text('Oturum durumu kontrol ediliyor...', style: TextStyle(fontSize: 12, color: Colors.grey)),
+                          ],
+                        ),
+                      ),
+                    )
+                  else if (_cloudAuthState.isSignedIn) ...[
                     Wrap(
                       spacing: 8,
                       runSpacing: 8,

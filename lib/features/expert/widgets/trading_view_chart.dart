@@ -48,8 +48,11 @@ class _TradingViewChartState extends State<TradingViewChart> {
   void didUpdateWidget(TradingViewChart oldWidget) {
     super.didUpdateWidget(oldWidget);
     debugPrint('TV_LOG: [${identityHashCode(this)}] didUpdateWidget. PropSymbol: ${widget.symbol}, LastLoaded: $_lastLoadedSymbol');
+    
     // Only reload if the symbol provided by the parent is DIFFERENT from what we actually have
+    // AND it's different from the old symbol (meaning a forced change from parent)
     if (widget.symbol != _lastLoadedSymbol && widget.symbol != oldWidget.symbol) {
+      debugPrint('TV_LOG: Reloading WebView for new symbol: ${widget.symbol}');
       _lastLoadedSymbol = widget.symbol;
       _webViewController?.loadData(data: _getHtml(widget.symbol));
     }
@@ -96,8 +99,17 @@ class _TradingViewChartState extends State<TradingViewChart> {
         // Listen for symbol changes and notify Flutter
         widget.onChartReady(function() {
           widget.chart().onSymbolChanged().subscribe(null, function(symbolData) {
+            // Send the full symbol string
             window.flutter_inappwebview.callHandler('onSymbolChanged', symbolData.name);
           });
+          
+          // Fallback: poll for symbol changes if subscribe doesn't work well
+          setInterval(function() {
+             var currentSymbol = widget.chart().symbol();
+             if (currentSymbol) {
+                window.flutter_inappwebview.callHandler('onSymbolChanged', currentSymbol);
+             }
+          }, 2000);
         });
       </script>
     </body>
@@ -120,8 +132,13 @@ class _TradingViewChartState extends State<TradingViewChart> {
             controller.addJavaScriptHandler(
               handlerName: 'onSymbolChanged',
               callback: (args) {
-                if (args.isNotEmpty && widget.onSymbolChanged != null) {
-                  widget.onSymbolChanged!(args[0].toString());
+                if (args.isNotEmpty) {
+                  final newSymbol = args[0].toString();
+                  // Important: Update internal state so didUpdateWidget doesn't trigger a reload
+                  _lastLoadedSymbol = newSymbol;
+                  if (widget.onSymbolChanged != null) {
+                    widget.onSymbolChanged!(newSymbol);
+                  }
                 }
               },
             );

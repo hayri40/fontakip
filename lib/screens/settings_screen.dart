@@ -408,7 +408,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
 
       if (!nextState.isSignedIn) {
         ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('Google ile giriş başarısız oldu.')),
+          SnackBar(content: Text('Google ile giriş başarısız oldu. (Giriş yapılmadı)')),
         );
         return;
       }

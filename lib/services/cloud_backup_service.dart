@@ -110,7 +110,7 @@ class GoogleCloudBackupService implements CloudBackupService {
     };
 
     // Initialize with scopes manually
-    _googleSignIn.initialize(scopes: const ['email', 'profile', _driveScope]);
+    _googleSignIn.initialize();
 
     // Listen for auth events to keep _currentUser in sync
     _googleSignIn.authenticationEvents.listen((event) {
@@ -152,11 +152,15 @@ class GoogleCloudBackupService implements CloudBackupService {
   Future<DriveUserSession?> _signInWithGoogle() async {
     developer.log('Starting Google Sign-In...', name: 'ExpertDebug');
     try {
-      final account = await _googleSignIn.authenticate();
+      final account = await _googleSignIn.signIn();
+      if (account == null) {
+        developer.log('Google Sign-In aborted by user or returned null.', name: 'ExpertDebug');
+        return null;
+      }
       _currentUser = account;
       
       developer.log('Google Account received: ${account.email}. Fetching auth...', name: 'ExpertDebug');
-      final dynamic googleAuth = await account.authentication;
+      final googleAuth = await account.authentication;
       developer.log('Google Auth tokens received. Signing into Firebase...', name: 'ExpertDebug');
       final credential = GoogleAuthProvider.credential(
         accessToken: null, 
@@ -167,8 +171,8 @@ class GoogleCloudBackupService implements CloudBackupService {
       
       return _mapGoogleAccount(account);
     } catch (e) {
-      developer.log('Google Sign-In failed: $e', name: 'ExpertDebug');
-      rethrow;
+      developer.log('CRITICAL: _signInWithGoogle exception: $e', name: 'ExpertDebug');
+      rethrow; // Re-throw to be caught by signIn()
     }
   }
 
@@ -228,8 +232,6 @@ class GoogleCloudBackupService implements CloudBackupService {
         error: error,
         stackTrace: stackTrace,
       );
-      final state = const AuthState(isSignedIn: false, provider: _provider);
-      await _persistAuthState(state);
       throw CloudBackupException(_describeSignInError(error));
     }
   }

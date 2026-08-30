@@ -134,10 +134,14 @@ class _TradingViewChartState extends State<TradingViewChart> {
               callback: (args) {
                 if (args.isNotEmpty) {
                   final newSymbol = args[0].toString();
-                  // Important: Update internal state so didUpdateWidget doesn't trigger a reload
-                  _lastLoadedSymbol = newSymbol;
-                  if (widget.onSymbolChanged != null) {
-                    widget.onSymbolChanged!(newSymbol);
+                  debugPrint('TV_LOG: JS reported symbol: $newSymbol');
+                  
+                  // Update internal state to prevent loop
+                  if (_lastLoadedSymbol != newSymbol) {
+                    _lastLoadedSymbol = newSymbol;
+                    if (widget.onSymbolChanged != null) {
+                      widget.onSymbolChanged!(newSymbol);
+                    }
                   }
                 }
               },

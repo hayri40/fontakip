@@ -73,6 +73,7 @@ class _FxStrategistHubScreenState extends State<FxStrategistHubScreen> {
   }
 
   void _onSymbolChanged(String newSymbol) {
+    debugPrint('TV_LOG: Hub received newSymbol: $newSymbol. Current: $_currentSymbol');
     if (newSymbol != _currentSymbol) {
       setState(() {
         _currentSymbol = newSymbol;

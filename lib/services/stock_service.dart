@@ -1,4 +1,5 @@
 import 'dart:convert';
+import 'dart:developer' as developer;
 
 import 'package:http/http.dart' as http;
 
@@ -142,6 +143,15 @@ class StockService {
   }
 
   Future<Map<String, dynamic>> _fetchPrice(String symbolForApi) async {
+    // Try TradingView first for BIST stocks
+    if (_isProbablyBist(symbolForApi)) {
+      try {
+        return await _fetchPriceFromTradingView(symbolForApi);
+      } catch (e) {
+        developer.log('TradingView fetch failed for $symbolForApi: $e', name: 'StockService');
+      }
+    }
+
     final config = await _resolveStockConfig();
 
     final response = await _get(
@@ -177,6 +187,80 @@ class StockService {
     }
 
     return _extractStockPayload(decoded);
+  }
+
+  bool _isProbablyBist(String symbol) {
+    // Check if it's in our known list or matches BIST pattern (usually 4-5 uppercase letters)
+    final normalized = symbol.trim().toUpperCase();
+    if (_bistStocks.any((s) => s['symbol'] == normalized)) return true;
+    return RegExp(r'^[A-Z]{4,5}$').hasMatch(normalized);
+  }
+
+  Future<Map<String, dynamic>> _fetchPriceFromTradingView(String symbol) async {
+    final url = Uri.parse('https://scanner.tradingview.com/turkey/scan');
+    final ticker = 'BIST:$symbol';
+    
+    final body = jsonEncode({
+      'symbols': {
+        'tickers': [ticker],
+        'query': { 'types': [] }
+      },
+      'columns': [
+        'close', 
+        'change', 
+        'change_abs', 
+        'high', 
+        'low', 
+        'volume', 
+        'open', 
+        'market_cap_basic', 
+        'price_earnings_ttm', 
+        'earnings_per_share_basic_ttm'
+      ]
+    });
+
+    final client = _client ?? http.Client();
+    try {
+      final response = await client.post(
+        url,
+        headers: {'Content-Type': 'application/json'},
+        body: body,
+      );
+
+      if (response.statusCode != 200) {
+        throw Exception('TV API status ${response.statusCode}');
+      }
+
+      final data = jsonDecode(response.body);
+      if (data['totalCount'] == 0 || data['data'] == null || (data['data'] as List).isEmpty) {
+        throw Exception('Symbol not found in TV');
+      }
+
+      final row = data['data'][0]['d'] as List;
+      
+      // Index mapping:
+      // 0: close, 1: change, 2: change_abs, 3: high, 4: low, 5: volume, 6: open, 7: mcap, 8: pe, 9: eps
+      final double close = _toDouble(row[0]) ?? 0;
+      final double changeAbs = _toDouble(row[2]) ?? 0;
+
+      return {
+        'price': close,
+        'high': _toDouble(row[3]),
+        'low': _toDouble(row[4]),
+        'previous_close': close - changeAbs,
+        'market_cap': _toDouble(row[7]),
+        'pe': _toDouble(row[8]),
+        'eps': _toDouble(row[9]),
+      };
+    } finally {
+      if (_client == null) client.close();
+    }
+  }
+
+  double? _toDouble(dynamic value) {
+    if (value == null) return null;
+    if (value is num) return value.toDouble();
+    return double.tryParse(value.toString());
   }
 
   static void clearCacheForTesting() {

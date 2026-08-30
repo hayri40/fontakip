@@ -98,15 +98,16 @@ class _TradingViewChartState extends State<TradingViewChart> {
 
         // Listen for symbol changes and notify Flutter
         widget.onChartReady(function() {
+          console.log("TV_JS: Chart Ready");
           widget.chart().onSymbolChanged().subscribe(null, function(symbolData) {
-            // Send the full symbol string
+            console.log("TV_JS: onSymbolChanged event: " + symbolData.name);
             window.flutter_inappwebview.callHandler('onSymbolChanged', symbolData.name);
           });
           
-          // Fallback: poll for symbol changes if subscribe doesn't work well
           setInterval(function() {
              var currentSymbol = widget.chart().symbol();
              if (currentSymbol) {
+                // Verbose log for polling
                 window.flutter_inappwebview.callHandler('onSymbolChanged', currentSymbol);
              }
           }, 2000);
@@ -134,10 +135,10 @@ class _TradingViewChartState extends State<TradingViewChart> {
               callback: (args) {
                 if (args.isNotEmpty) {
                   final newSymbol = args[0].toString();
-                  debugPrint('TV_LOG: JS reported symbol: $newSymbol');
                   
                   // Update internal state to prevent loop
                   if (_lastLoadedSymbol != newSymbol) {
+                    debugPrint('TV_LOG: [BRIDGE] JS reported NEW symbol: $newSymbol (Previous was: $_lastLoadedSymbol)');
                     _lastLoadedSymbol = newSymbol;
                     if (widget.onSymbolChanged != null) {
                       widget.onSymbolChanged!(newSymbol);

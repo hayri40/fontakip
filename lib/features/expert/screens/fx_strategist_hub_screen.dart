@@ -86,7 +86,8 @@ class _FxStrategistHubScreenState extends State<FxStrategistHubScreen> {
     final symbol = _currentSymbol;
     final isFav = _watchlist.contains(symbol);
     
-    debugPrint('WATCHLIST_LOG: Toggling favorite for $symbol. Current state: $isFav');
+    debugPrint('TV_LOG: [FAVORITE_ACTION] User clicked STAR. Current Hub Symbol: $symbol');
+    debugPrint('TV_LOG: [WATCHLIST_STATE] Watchlist contains $symbol: $isFav');
 
     try {
       await _firestoreService.toggleWatchlist(symbol, !isFav);

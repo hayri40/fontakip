@@ -53,6 +53,8 @@ class StockService {
     {'symbol': 'ENKAI', 'name': 'Enka Insaat'},
     {'symbol': 'MGROS', 'name': 'Migros'},
     {'symbol': 'BASGZ', 'name': 'Baskent Gaz'},
+    {'symbol': 'FZLGY', 'name': 'Fuzul GYO'},
+    {'symbol': 'CITAS', 'name': 'Cimentas'},
   ];
 
   Future<List<Stock>> searchStocks(String query) async {
@@ -143,24 +145,38 @@ class StockService {
   }
 
   Future<Map<String, dynamic>> _fetchPrice(String symbolForApi) async {
-    // Try TradingView first for BIST stocks
-    if (_isProbablyBist(symbolForApi)) {
-      try {
-        return await _fetchPriceFromTradingView(symbolForApi);
-      } catch (e) {
-        developer.log('TradingView fetch failed for $symbolForApi: $e', name: 'StockService');
-      }
-    }
-
     final config = await _resolveStockConfig();
+    final url = config.apiUrl.toLowerCase();
 
-    final response = await _get(
-      _buildPriceUri(
-        rawSymbol: symbolForApi,
-        apiUrl: config.apiUrl,
-        apiKey: config.apiKey,
-        appendDotIs: config.appendDotIs,
-      ),
+    // STRICT PROVIDER LOGIC: No silent fallback
+    if (url.contains('tradingview') || url == 'tradingview') {
+      return await _fetchPriceFromTradingView(symbolForApi);
+    } else {
+      return await _fetchPriceFromHttpApi(symbolForApi, config);
+    }
+  }
+
+  Future<Map<String, dynamic>> _fetchPriceFromHttpApi(
+    String symbolForApi,
+    StockDataSourceConfig config,
+  ) async {
+    final uri = _buildPriceUri(
+      rawSymbol: symbolForApi,
+      apiUrl: config.apiUrl,
+      apiKey: config.apiKey,
+      appendDotIs: config.appendDotIs,
+    );
+
+    developer.log(
+      'STOCK_FETCH: Provider=HTTP_API Symbol=$symbolForApi URL=${uri.toString()}',
+      name: 'StockService',
+    );
+
+    final response = await _get(uri);
+
+    developer.log(
+      'STOCK_FETCH: Status=${response.statusCode} Response=${response.body}',
+      name: 'StockService',
     );
 
     if (response.statusCode != 200) {
@@ -176,7 +192,8 @@ class StockService {
 
     final decoded = jsonDecode(response.body);
     final json = decoded is Map<String, dynamic> ? decoded : <String, dynamic>{};
-    final status = (json['status'] ?? json['result'] ?? '').toString().toLowerCase();
+    final status =
+        (json['status'] ?? json['result'] ?? '').toString().toLowerCase();
     if (status == 'error') {
       final errorMessage = _extractMessage(response.body, json);
       if (errorMessage.contains(_planRestrictionText)) {
@@ -190,7 +207,6 @@ class StockService {
   }
 
   bool _isProbablyBist(String symbol) {
-    // Check if it's in our known list or matches BIST pattern (usually 4-5 uppercase letters)
     final normalized = symbol.trim().toUpperCase();
     if (_bistStocks.any((s) => s['symbol'] == normalized)) return true;
     return RegExp(r'^[A-Z]{4,5}$').hasMatch(normalized);
@@ -199,32 +215,42 @@ class StockService {
   Future<Map<String, dynamic>> _fetchPriceFromTradingView(String symbol) async {
     final url = Uri.parse('https://scanner.tradingview.com/turkey/scan');
     final ticker = 'BIST:$symbol';
-    
+
     final body = jsonEncode({
       'symbols': {
         'tickers': [ticker],
-        'query': { 'types': [] }
+        'query': {'types': []}
       },
       'columns': [
-        'close', 
-        'change', 
-        'change_abs', 
-        'high', 
-        'low', 
-        'volume', 
-        'open', 
-        'market_cap_basic', 
-        'price_earnings_ttm', 
+        'close',
+        'change',
+        'change_abs',
+        'high',
+        'low',
+        'volume',
+        'open',
+        'market_cap_basic',
+        'price_earnings_ttm',
         'earnings_per_share_basic_ttm'
       ]
     });
 
     final client = _client ?? http.Client();
     try {
+      developer.log(
+        'STOCK_FETCH: Provider=TradingView Symbol=$symbol Ticker=$ticker',
+        name: 'StockService',
+      );
+
       final response = await client.post(
         url,
         headers: {'Content-Type': 'application/json'},
         body: body,
+      );
+
+      developer.log(
+        'STOCK_FETCH: Provider=TradingView Symbol=$symbol Status=${response.statusCode} Response=${response.body}',
+        name: 'StockService',
       );
 
       if (response.statusCode != 200) {
@@ -232,12 +258,14 @@ class StockService {
       }
 
       final data = jsonDecode(response.body);
-      if (data['totalCount'] == 0 || data['data'] == null || (data['data'] as List).isEmpty) {
-        throw Exception('Symbol not found in TV');
+      if (data['totalCount'] == 0 ||
+          data['data'] == null ||
+          (data['data'] as List).isEmpty) {
+        throw Exception('$symbol sembolü TradingView üzerinde bulunamadı.');
       }
 
       final row = data['data'][0]['d'] as List;
-      
+
       // Index mapping:
       // 0: close, 1: change, 2: change_abs, 3: high, 4: low, 5: volume, 6: open, 7: mcap, 8: pe, 9: eps
       final double close = _toDouble(row[0]) ?? 0;

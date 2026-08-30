@@ -109,7 +109,7 @@ class GoogleCloudBackupService implements CloudBackupService {
       }
     };
 
-    // Initialize with scopes manually
+    // Initialize without passing 'scopes' as it's not a named parameter
     _googleSignIn.initialize();
 
     // Listen for auth events to keep _currentUser in sync
@@ -152,15 +152,12 @@ class GoogleCloudBackupService implements CloudBackupService {
   Future<DriveUserSession?> _signInWithGoogle() async {
     developer.log('Starting Google Sign-In...', name: 'ExpertDebug');
     try {
-      final account = await _googleSignIn.signIn();
-      if (account == null) {
-        developer.log('Google Sign-In aborted by user or returned null.', name: 'ExpertDebug');
-        return null;
-      }
+      // Version 7.2.0 uses authenticate() for interactive sign-in
+      final account = await _googleSignIn.authenticate();
       _currentUser = account;
       
       developer.log('Google Account received: ${account.email}. Fetching auth...', name: 'ExpertDebug');
-      final googleAuth = await account.authentication;
+      final dynamic googleAuth = await account.authentication;
       developer.log('Google Auth tokens received. Signing into Firebase...', name: 'ExpertDebug');
       final credential = GoogleAuthProvider.credential(
         accessToken: null, 
@@ -172,12 +169,13 @@ class GoogleCloudBackupService implements CloudBackupService {
       return _mapGoogleAccount(account);
     } catch (e) {
       developer.log('CRITICAL: _signInWithGoogle exception: $e', name: 'ExpertDebug');
-      rethrow; // Re-throw to be caught by signIn()
+      rethrow; 
     }
   }
 
   Future<DriveUserSession?> _silentSignInAction() async {
     try {
+      // Version 7.2.0 uses attemptLightweightAuthentication() for silent sign-in
       final account = await _googleSignIn.attemptLightweightAuthentication();
       if (account != null) {
         _currentUser = account;
@@ -297,7 +295,7 @@ class GoogleCloudBackupService implements CloudBackupService {
       uri: Uri.parse('$_driveFilesEndpoint/${backupFile.id}?alt=media'),
       authHeaders: authHeaders,
     );
-    _ensureDriveSuccess(operation: 'download backup', response: response);
+    _ensureDriveSuccess(response, operation: 'download backup');
 
     final info = _buildSignedInInfo(
       user: session.user,

@@ -248,7 +248,9 @@ class _PortfolioScreenState extends State<PortfolioScreen> {
   Widget _buildBody() {
     switch (_selectedTabIndex) {
       case 0:
-        return const PortfolioDashboardScreen();
+        return PortfolioDashboardScreen(
+          onFundSelected: _onFavoriteSelected,
+        );
 
       case 1:
         return _buildSearchTab();

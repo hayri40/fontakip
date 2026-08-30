@@ -5,7 +5,9 @@ import '../models/holding.dart';
 import '../services/portfolio_service.dart';
 
 class PortfolioDashboardScreen extends StatefulWidget {
-  const PortfolioDashboardScreen({super.key});
+  final Function(String)? onFundSelected;
+
+  const PortfolioDashboardScreen({super.key, this.onFundSelected});
 
   @override
   State<PortfolioDashboardScreen> createState() =>
@@ -142,114 +144,120 @@ class _PortfolioDashboardScreenState extends State<PortfolioDashboardScreen> {
 
           return Card(
             margin: const EdgeInsets.only(bottom: 12),
-            child: Padding(
-              padding: const EdgeInsets.all(16),
-              child: Row(
-                crossAxisAlignment: CrossAxisAlignment.center,
-                children: [
-                  Expanded(
-                    flex: 2,
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      mainAxisSize: MainAxisSize.min,
-                      children: [
-                        Text(
-                          holding.fundCode,
-                          style: const TextStyle(
-                            fontSize: 18,
-                            fontWeight: FontWeight.w700,
-                          ),
-                        ),
-                        const SizedBox(height: 8),
-                        Column(
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          children: [
-                            const Text(
-                              'Pay',
-                              style: TextStyle(
-                                color: Colors.amber,
-                                fontWeight: FontWeight.w700,
-                                fontSize: 12,
-                              ),
+            child: InkWell(
+              onTap: widget.onFundSelected != null
+                  ? () => widget.onFundSelected!(holding.fundCode)
+                  : null,
+              borderRadius: BorderRadius.circular(12),
+              child: Padding(
+                padding: const EdgeInsets.all(16),
+                child: Row(
+                  crossAxisAlignment: CrossAxisAlignment.center,
+                  children: [
+                    Expanded(
+                      flex: 2,
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          Text(
+                            holding.fundCode,
+                            style: const TextStyle(
+                              fontSize: 18,
+                              fontWeight: FontWeight.w700,
                             ),
-                            Text(
-                              AppFormatters.percentValue(holding.portfolioSharePercent),
-                              style: const TextStyle(
-                                color: Colors.amber,
-                                fontWeight: FontWeight.w700,
-                                fontSize: 12,
+                          ),
+                          const SizedBox(height: 8),
+                          Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              const Text(
+                                'Pay',
+                                style: TextStyle(
+                                  color: Colors.amber,
+                                  fontWeight: FontWeight.w700,
+                                  fontSize: 12,
+                                ),
                               ),
-                            ),
-                          ],
-                        ),
-                      ],
-                    ),
-                  ),
-                  Expanded(
-                    flex: 4,
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      mainAxisSize: MainAxisSize.min,
-                      children: [
-                        Text(
-                          'Mal_Fiyatı: ${AppFormatters.currencyValue(holding.averageCost)}',
-                          style: const TextStyle(fontSize: 12),
-                        ),
-                        const SizedBox(height: 6),
-                        Text(
-                          'Adet: ${AppFormatters.quantityLabel(holding.quantity)}',
-                          style: const TextStyle(fontSize: 12),
-                        ),
-                        const SizedBox(height: 6),
-                        Text(
-                          'Toplam: ${AppFormatters.currencyValue(holding.costValue)}',
-                          style: const TextStyle(
-                            color: Colors.orange,
-                            fontSize: 12,
+                              Text(
+                                AppFormatters.percentValue(holding.portfolioSharePercent),
+                                style: const TextStyle(
+                                  color: Colors.amber,
+                                  fontWeight: FontWeight.w700,
+                                  fontSize: 12,
+                                ),
+                              ),
+                            ],
                           ),
-                        ),
-                      ],
+                        ],
+                      ),
                     ),
-                  ),
-                  Expanded(
-                    flex: 4,
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      mainAxisSize: MainAxisSize.min,
-                      children: [
-                        Text(
-                          'Gün_Fiyatı: ${AppFormatters.currencyValue(holding.currentPrice)}',
-                          style: const TextStyle(
-                            color: Colors.cyan,
-                            fontSize: 12,
+                    Expanded(
+                      flex: 4,
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          Text(
+                            'Mal_Fiyatı: ${AppFormatters.currencyValue(holding.averageCost)}',
+                            style: const TextStyle(fontSize: 12),
                           ),
-                        ),
-                        const SizedBox(height: 6),
-                        FittedBox(
-                          fit: BoxFit.scaleDown,
-                          alignment: Alignment.centerLeft,
-                          child: Text(
-                            'K/Z: ${AppFormatters.signedCurrencyValue(holding.profitLoss)} '
-                            '(${AppFormatters.percentValue(holding.profitLossPercent)})',
-                            style: TextStyle(
-                              color: profitColor,
-                              fontWeight: FontWeight.w600,
+                          const SizedBox(height: 6),
+                          Text(
+                            'Adet: ${AppFormatters.quantityLabel(holding.quantity)}',
+                            style: const TextStyle(fontSize: 12),
+                          ),
+                          const SizedBox(height: 6),
+                          Text(
+                            'Toplam: ${AppFormatters.currencyValue(holding.costValue)}',
+                            style: const TextStyle(
+                              color: Colors.orange,
                               fontSize: 12,
                             ),
                           ),
-                        ),
-                        const SizedBox(height: 6),
-                        Text(
-                          'Toplam: ${AppFormatters.currencyValue(holding.currentValue)}',
-                          style: const TextStyle(
-                            color: Colors.cyan,
-                            fontSize: 12,
-                          ),
-                        ),
-                      ],
+                        ],
+                      ),
                     ),
-                  ),
-                ],
+                    Expanded(
+                      flex: 4,
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          Text(
+                            'Gün_Fiyatı: ${AppFormatters.currencyValue(holding.currentPrice)}',
+                            style: const TextStyle(
+                              color: Colors.cyan,
+                              fontSize: 12,
+                            ),
+                          ),
+                          const SizedBox(height: 6),
+                          FittedBox(
+                            fit: BoxFit.scaleDown,
+                            alignment: Alignment.centerLeft,
+                            child: Text(
+                              'K/Z: ${AppFormatters.signedCurrencyValue(holding.profitLoss)} '
+                              '(${AppFormatters.percentValue(holding.profitLossPercent)})',
+                              style: TextStyle(
+                                color: profitColor,
+                                fontWeight: FontWeight.w600,
+                                fontSize: 12,
+                              ),
+                            ),
+                          ),
+                          const SizedBox(height: 6),
+                          Text(
+                            'Toplam: ${AppFormatters.currencyValue(holding.currentValue)}',
+                            style: const TextStyle(
+                              color: Colors.cyan,
+                              fontSize: 12,
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                  ],
+                ),
               ),
             ),
           );

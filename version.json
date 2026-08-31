@@ -1,10 +1,10 @@
 {
-  "version": "0.9.0",
-  "releaseDate": "2026-08-29",
+  "version": "1.5.15",
+  "releaseDate": "2026-08-31",
   "notes": [
-    "TradeDesk AI: Watchlist ve Bulut Senkronizasyonu eklendi.",
-    "Android 14+ ve Windows uyumluluk güncellemeleri yapıldı.",
-    "Grafik çizimlerini otomatik kaydetme özelliği aktif."
+    "Portföy kartları kompakt üç bloklu düzene getirildi.",
+    "Günlük performans alanı ortalandı ve hizalama düzeltildi.",
+    "Güncelleme notları artık özel release notlarından üretiliyor."
   ],
-  "apkUrl": "https://github.com/hayri40/fontakip/releases/download/v0.9.0/fontakip-v0.9.0.apk"
+  "apkUrl": "https://github.com/hayri40/fontakip/releases/download/v1.5.15/fontakip-1.5.15.apk"
 }

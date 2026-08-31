@@ -1,4 +1,7 @@
+import 'dart:convert';
 import 'package:flutter/material.dart';
+import 'package:intl/intl.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 
 import '../core/formatters/app_formatters.dart';
 import '../features/debts/data/debt_repository.dart';
@@ -31,6 +34,7 @@ class _GeneralPortfolioScreenState extends State<GeneralPortfolioScreen> {
 
   List<Holding> _fundHoldings = [];
   List<StockHolding> _stockHoldings = [];
+  _PerformanceRecord? _lastPerformanceRecord;
   bool _loading = true;
   String? _fundError;
   String? _stockError;
@@ -54,8 +58,26 @@ class _GeneralPortfolioScreenState extends State<GeneralPortfolioScreen> {
 
     List<Holding> fundHoldings = [];
     List<StockHolding> stockHoldings = [];
+    _PerformanceRecord? lastRecord;
     String? fundError;
     String? stockError;
+
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      final savedRecords = prefs.getString('performance.records');
+      if (savedRecords != null) {
+        final decoded = jsonDecode(savedRecords) as List<dynamic>;
+        if (decoded.isNotEmpty) {
+          final lastItem = decoded.last as Map<String, dynamic>;
+          lastRecord = _PerformanceRecord(
+            date: DateTime.parse(lastItem['date'] as String),
+            portfolioValue: (lastItem['portfolioValue'] as num).toDouble(),
+          );
+        }
+      }
+    } catch (e) {
+      debugPrint('Error loading performance records: $e');
+    }
 
     try {
       fundHoldings = await _portfolioService.getHoldings();
@@ -76,6 +98,7 @@ class _GeneralPortfolioScreenState extends State<GeneralPortfolioScreen> {
     setState(() {
       _fundHoldings = fundHoldings;
       _stockHoldings = stockHoldings;
+      _lastPerformanceRecord = lastRecord;
       _fundError = fundError;
       _stockError = stockError;
       _loading = false;
@@ -154,6 +177,10 @@ class _GeneralPortfolioScreenState extends State<GeneralPortfolioScreen> {
                     totalProfitLoss: totalProfitLoss,
                     totalProfitLossPercent: totalProfitLossPercent,
                   ),
+                  if (_lastPerformanceRecord != null) ...[
+                    const SizedBox(height: 12),
+                    _buildPerformanceSummaryCard(totalValue),
+                  ],
                   const SizedBox(height: 12),
                   _buildBreakdownCard(
                     fundValue: fundValue,
@@ -262,6 +289,128 @@ class _GeneralPortfolioScreenState extends State<GeneralPortfolioScreen> {
           ],
         ),
       ),
+    );
+  }
+
+  Widget _buildPerformanceSummaryCard(double currentValue) {
+    final lastRecord = _lastPerformanceRecord!;
+    final diff = currentValue - lastRecord.portfolioValue;
+    final percent = lastRecord.portfolioValue == 0
+        ? 0.0
+        : (diff / lastRecord.portfolioValue) * 100;
+    final isProfit = diff >= 0;
+    final accentColor = isProfit ? Colors.green : Colors.red;
+    final dateStr = DateFormat('dd.MM.yyyy').format(lastRecord.date);
+
+    return Card(
+      color: const Color(0xFF1A1D24),
+      child: Padding(
+        padding: const EdgeInsets.all(18),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Row(
+              mainAxisAlignment: MainAxisAlignment.spaceBetween,
+              children: [
+                const Text(
+                  '📈 Son Kayıttan Bu Yana',
+                  style: TextStyle(
+                    fontSize: 15,
+                    fontWeight: FontWeight.bold,
+                    color: Colors.cyan,
+                  ),
+                ),
+                Text(
+                  dateStr,
+                  style: TextStyle(color: Colors.grey[500], fontSize: 12),
+                ),
+              ],
+            ),
+            const SizedBox(height: 14),
+            Row(
+              children: [
+                Expanded(
+                  child: _summaryItem(
+                    'Son Kayıt',
+                    AppFormatters.currencyValue(lastRecord.portfolioValue),
+                  ),
+                ),
+                Expanded(
+                  child: _summaryItem(
+                    'Güncel Portföy',
+                    AppFormatters.currencyValue(currentValue),
+                  ),
+                ),
+              ],
+            ),
+            const Divider(height: 24, color: Colors.white10),
+            Row(
+              children: [
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        'Fark',
+                        style: TextStyle(color: Colors.grey[400], fontSize: 12),
+                      ),
+                      const SizedBox(height: 4),
+                      Text(
+                        AppFormatters.signedCurrencyValue(diff),
+                        style: TextStyle(
+                          color: accentColor,
+                          fontSize: 16,
+                          fontWeight: FontWeight.bold,
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        'Getiri',
+                        style: TextStyle(color: Colors.grey[400], fontSize: 12),
+                      ),
+                      const SizedBox(height: 4),
+                      Text(
+                        AppFormatters.signedPercentValue(percent),
+                        style: TextStyle(
+                          color: accentColor,
+                          fontSize: 16,
+                          fontWeight: FontWeight.bold,
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+              ],
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _summaryItem(String label, String value) {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Text(
+          label,
+          style: TextStyle(color: Colors.grey[400], fontSize: 12),
+        ),
+        const SizedBox(height: 4),
+        Text(
+          value,
+          style: const TextStyle(
+            fontSize: 14,
+            fontWeight: FontWeight.w600,
+          ),
+        ),
+      ],
     );
   }
 
@@ -403,4 +552,14 @@ class _GeneralPortfolioScreenState extends State<GeneralPortfolioScreen> {
       ),
     );
   }
+}
+
+class _PerformanceRecord {
+  final DateTime date;
+  final double portfolioValue;
+
+  _PerformanceRecord({
+    required this.date,
+    required this.portfolioValue,
+  });
 }

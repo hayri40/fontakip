@@ -7,8 +7,10 @@ import '../core/formatters/app_formatters.dart';
 import '../features/debts/data/debt_repository.dart';
 import '../models/holding.dart';
 import '../models/stock_holding.dart';
+import '../models/fx_asset.dart';
 import '../services/portfolio_service.dart';
 import '../services/stock_portfolio_service.dart';
+import '../services/fx_market_service.dart';
 import 'debt_screen.dart';
 
 class GeneralPortfolioScreen extends StatefulWidget {
@@ -35,6 +37,7 @@ class _GeneralPortfolioScreenState extends State<GeneralPortfolioScreen> {
   List<Holding> _fundHoldings = [];
   List<StockHolding> _stockHoldings = [];
   _PerformanceRecord? _lastPerformanceRecord;
+  double _fxTlValue = 0.0;
   bool _loading = true;
   String? _fundError;
   String? _stockError;
@@ -59,6 +62,7 @@ class _GeneralPortfolioScreenState extends State<GeneralPortfolioScreen> {
     List<Holding> fundHoldings = [];
     List<StockHolding> stockHoldings = [];
     _PerformanceRecord? lastRecord;
+    double fxTlValue = 0.0;
     String? fundError;
     String? stockError;
 
@@ -75,8 +79,24 @@ class _GeneralPortfolioScreenState extends State<GeneralPortfolioScreen> {
           );
         }
       }
+
+      // Load FX Balance and rate
+      final usdBalance = prefs.getDouble('fx.balance_usd') ?? 0.0;
+      if (usdBalance > 0) {
+        try {
+          const fxService = FxMarketService();
+          final asset = await fxService.getDetailBySymbol(
+            symbol: 'USD/TRY',
+            name: 'USD/TRY',
+            type: FxAssetType.currency,
+          );
+          fxTlValue = usdBalance * (asset.currentPrice ?? 0.0);
+        } catch (e) {
+          debugPrint('Error fetching FX rate in GeneralPortfolio: $e');
+        }
+      }
     } catch (e) {
-      debugPrint('Error loading performance records: $e');
+      debugPrint('Error loading prefs in GeneralPortfolio: $e');
     }
 
     try {
@@ -99,6 +119,7 @@ class _GeneralPortfolioScreenState extends State<GeneralPortfolioScreen> {
       _fundHoldings = fundHoldings;
       _stockHoldings = stockHoldings;
       _lastPerformanceRecord = lastRecord;
+      _fxTlValue = fxTlValue;
       _fundError = fundError;
       _stockError = stockError;
       _loading = false;
@@ -131,7 +152,7 @@ class _GeneralPortfolioScreenState extends State<GeneralPortfolioScreen> {
       0.0,
       (sum, item) => sum + item.costValue,
     );
-    const fxValue = 0.0;
+    final fxValue = _fxTlValue;
     final totalValue = fundValue + stockValue + fxValue;
     final totalCost = fundCost + stockCost;
     final totalProfitLoss = totalValue - totalCost;

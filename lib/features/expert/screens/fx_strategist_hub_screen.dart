@@ -1,8 +1,15 @@
 import 'package:flutter/material.dart';
+import 'package:shared_preferences/shared_preferences.dart';
+import '../../../core/formatters/app_formatters.dart';
 import '../../../models/expert_models.dart';
+import '../../../models/fx_asset.dart';
 import '../../../services/expert_service.dart';
 import '../../../services/expert_firestore_service.dart';
+import '../../../services/fx_market_service.dart';
 import '../widgets/expert_chat_bubble.dart';
+import '../widgets/expert_action_bar.dart';
+import '../widgets/trading_view_chart.dart';
+import 'rules_manager_screen.dart';
 import '../widgets/expert_action_bar.dart';
 import '../widgets/trading_view_chart.dart';
 import 'fullscreen_chart_screen.dart';
@@ -22,6 +29,7 @@ class _FxStrategistHubScreenState extends State<FxStrategistHubScreen> {
   
   final ExpertService _expertService = ExpertService();
   final ExpertFirestoreService _firestoreService = ExpertFirestoreService();
+  final FxMarketService _marketService = const FxMarketService();
   
   // Use a GlobalKey to keep the TradingViewChart alive across layout changes
   final GlobalKey _chartKey = GlobalKey();
@@ -30,6 +38,8 @@ class _FxStrategistHubScreenState extends State<FxStrategistHubScreen> {
   bool _isLoading = false;
   bool _isFullScreen = false;
   String _currentSymbol = 'FX:GBPCAD';
+  double _fxBalanceUsd = 0.0;
+  double _usdTryRate = 0.0;
   double _scrollOffset = 0;
   List<String> _watchlist = [];
 
@@ -54,6 +64,29 @@ class _FxStrategistHubScreenState extends State<FxStrategistHubScreen> {
   }
 
   Future<void> _loadInitialState() async {
+    final prefs = await SharedPreferences.getInstance();
+    if (mounted) {
+      setState(() {
+        _fxBalanceUsd = prefs.getDouble('fx.balance_usd') ?? 0.0;
+      });
+    }
+
+    // Fetch USDTRY rate
+    try {
+      final asset = await _marketService.getDetailBySymbol(
+        symbol: 'USD/TRY',
+        name: 'USD/TRY',
+        type: FxAssetType.currency,
+      );
+      if (mounted) {
+        setState(() {
+          _usdTryRate = asset.currentPrice ?? 0.0;
+        });
+      }
+    } catch (e) {
+      debugPrint('Error fetching USDTRY for balance: $e');
+    }
+
     // Load last chart state
     final state = await _firestoreService.getChartState();
     if (state != null && mounted) {
@@ -201,6 +234,77 @@ class _FxStrategistHubScreenState extends State<FxStrategistHubScreen> {
     }
   }
 
+  Widget _buildBalanceInput() {
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+      decoration: BoxDecoration(
+        color: const Color(0xFF1A1D24),
+        borderRadius: BorderRadius.circular(10),
+        border: Border.all(color: Colors.white10),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          const Text(
+            'FX Bakiyesi (USD)',
+            style: TextStyle(color: Colors.white54, fontSize: 10),
+          ),
+          const SizedBox(height: 4),
+          TextFormField(
+            initialValue: _fxBalanceUsd == 0 ? '' : _fxBalanceUsd.toString(),
+            keyboardType: const TextInputType.numberWithOptions(decimal: true),
+            style: const TextStyle(
+              color: Colors.white,
+              fontSize: 15,
+              fontWeight: FontWeight.bold,
+            ),
+            decoration: const InputDecoration(
+              isDense: true,
+              contentPadding: EdgeInsets.zero,
+              border: InputBorder.none,
+              hintText: '0.00',
+              hintStyle: TextStyle(color: Colors.white24),
+            ),
+            onChanged: _updateBalance,
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildBalanceDisplay() {
+    final tlValue = _fxBalanceUsd * _usdTryRate;
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+      decoration: BoxDecoration(
+        color: Colors.cyan.withValues(alpha: 0.1),
+        borderRadius: BorderRadius.circular(10),
+        border: Border.all(color: Colors.cyan.withValues(alpha: 0.3)),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          const Text(
+            'TL Karşılığı',
+            style: TextStyle(color: Colors.cyan, fontSize: 10),
+          ),
+          const SizedBox(height: 4),
+          FittedBox(
+            fit: BoxFit.scaleDown,
+            child: Text(
+              AppFormatters.currencyValue(tlValue),
+              style: const TextStyle(
+                color: Colors.cyan,
+                fontSize: 15,
+                fontWeight: FontWeight.bold,
+              ),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
   void _scrollToBottom() {
     Future.delayed(const Duration(milliseconds: 100), () {
       if (_pageScrollController.hasClients) {
@@ -211,6 +315,17 @@ class _FxStrategistHubScreenState extends State<FxStrategistHubScreen> {
         );
       }
     });
+  }
+
+  Future<void> _updateBalance(String value) async {
+    final val = double.tryParse(value.replaceAll(',', '.')) ?? 0.0;
+    final prefs = await SharedPreferences.getInstance();
+    await prefs.setDouble('fx.balance_usd', val);
+    if (mounted) {
+      setState(() {
+        _fxBalanceUsd = val;
+      });
+    }
   }
 
   @override
@@ -394,17 +509,39 @@ class _FxStrategistHubScreenState extends State<FxStrategistHubScreen> {
                 clipBehavior: Clip.antiAlias,
                 child: Stack(
                   children: [
-                    TradingViewChart(
-                      key: _chartKey,
-                      symbol: _currentSymbol, 
-                      showControls: true,
-                      onSymbolChanged: _onSymbolChanged,
+                    Column(
+                      children: [
+                        if (!_isFullScreen)
+                          Container(
+                            padding: const EdgeInsets.fromLTRB(12, 12, 12, 8),
+                            color: const Color(0xFF161922),
+                            child: Row(
+                              children: [
+                                Expanded(
+                                  child: _buildBalanceInput(),
+                                ),
+                                const SizedBox(width: 12),
+                                Expanded(
+                                  child: _buildBalanceDisplay(),
+                                ),
+                              ],
+                            ),
+                          ),
+                        Expanded(
+                          child: TradingViewChart(
+                            key: _chartKey,
+                            symbol: _currentSymbol,
+                            showControls: true,
+                            onSymbolChanged: _onSymbolChanged,
+                          ),
+                        ),
+                      ],
                     ),
                     
                     // NEW: Right Bar for Fav, Watchlist, and Fullscreen
                     if (!_isFullScreen)
                       Positioned(
-                        top: 8,
+                        top: 60, // Adjusted for balance bar
                         right: 8,
                         child: Row(
                           mainAxisSize: MainAxisSize.min,

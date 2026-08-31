@@ -16,35 +16,49 @@ class _StockPortfolioScreenState extends State<StockPortfolioScreen> {
   final _service = StockPortfolioService();
 
   List<StockHolding> _holdings = [];
-  bool _loading = true;
+  bool _loading = false;
   String? _errorMessage;
   DateTime? _lastUpdated;
 
   @override
   void initState() {
     super.initState();
-    _loadPortfolio();
+    
+    // Initial sync from cache if available
+    if (_service.cachedHoldings != null) {
+      _holdings = _service.cachedHoldings!;
+      _lastUpdated = _service.lastUpdateTime;
+      _loading = false;
+    } else {
+      _loading = true;
+      _loadPortfolio(forceRefresh: false);
+    }
   }
 
-  Future<void> _loadPortfolio() async {
+  Future<void> _loadPortfolio({bool forceRefresh = false}) async {
+    if (!mounted) return;
+    
     setState(() {
       _loading = true;
       _errorMessage = null;
     });
 
     try {
-      final holdings = await _service.getHoldings();
+      final holdings = await _service.getHoldings(forceRefresh: forceRefresh);
 
+      if (!mounted) return;
       setState(() {
         _holdings = holdings;
         _loading = false;
-        _lastUpdated = DateTime.now();
+        _lastUpdated = _service.lastUpdateTime;
       });
     } catch (e) {
-      setState(() {
-        _loading = false;
-        _errorMessage = 'Portföy yüklenemedi: $e';
-      });
+      if (mounted) {
+        setState(() {
+          _loading = false;
+          _errorMessage = 'Portföy yüklenemedi: $e';
+        });
+      }
     }
   }
 
@@ -70,7 +84,7 @@ class _StockPortfolioScreenState extends State<StockPortfolioScreen> {
               ),
               const SizedBox(height: 16),
               ElevatedButton(
-                onPressed: _loadPortfolio,
+                onPressed: () => _loadPortfolio(forceRefresh: true),
                 child: const Text('Tekrar Dene'),
               ),
             ],
@@ -80,7 +94,16 @@ class _StockPortfolioScreenState extends State<StockPortfolioScreen> {
     }
 
     if (_holdings.isEmpty) {
-      return const Center(child: Text('Henüz hisse portföyü oluşmadı'));
+      return RefreshIndicator(
+        onRefresh: () => _loadPortfolio(forceRefresh: true),
+        child: ListView(
+          physics: const AlwaysScrollableScrollPhysics(),
+          children: const [
+            SizedBox(height: 100),
+            Center(child: Text('Henüz hisse portföyü oluşmadı')),
+          ],
+        ),
+      );
     }
 
     final totalCost = _holdings.fold(0.0, (sum, item) => sum + item.costValue);
@@ -97,9 +120,10 @@ class _StockPortfolioScreenState extends State<StockPortfolioScreen> {
         : (totalProfitLoss / totalCost) * 100;
 
     return RefreshIndicator(
-      onRefresh: _loadPortfolio,
+      onRefresh: () => _loadPortfolio(forceRefresh: true),
       child: ListView(
         padding: const EdgeInsets.all(16),
+        physics: const AlwaysScrollableScrollPhysics(),
         children: [
           Card(
             margin: const EdgeInsets.only(bottom: 16),
@@ -118,7 +142,7 @@ class _StockPortfolioScreenState extends State<StockPortfolioScreen> {
                       IconButton(
                         icon: const Icon(Icons.refresh),
                         tooltip: 'Yenile',
-                        onPressed: _loadPortfolio,
+                        onPressed: () => _loadPortfolio(forceRefresh: true),
                       ),
                     ],
                   ),

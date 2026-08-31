@@ -18,7 +18,7 @@ import 'package:fontakip/services/stock_portfolio_service.dart';
 
 class _FakePortfolioService extends PortfolioService {
   @override
-  Future<List<Holding>> getHoldings() async {
+  Future<List<Holding>> getHoldings({bool forceRefresh = false}) async {
     return const [
       Holding(
         fundCode: 'KTJ',
@@ -59,7 +59,7 @@ class _FakePortfolioService extends PortfolioService {
 
 class _FakeStockPortfolioService extends StockPortfolioService {
   @override
-  Future<List<StockHolding>> getHoldings() async {
+  Future<List<StockHolding>> getHoldings({bool forceRefresh = false}) async {
     return const [
       StockHolding(
         symbol: 'THYAO',
@@ -103,7 +103,7 @@ class _SequencedPortfolioService extends PortfolioService {
   int _index = 0;
 
   @override
-  Future<List<Holding>> getHoldings() async {
+  Future<List<Holding>> getHoldings({bool forceRefresh = false}) async {
     final selectedIndex = _index >= values.length ? values.length - 1 : _index;
     final value = values[selectedIndex];
     _index++;
@@ -125,7 +125,7 @@ class _SequencedPortfolioService extends PortfolioService {
 
 class _EmptyStockPortfolioService extends StockPortfolioService {
   @override
-  Future<List<StockHolding>> getHoldings() async => const [];
+  Future<List<StockHolding>> getHoldings({bool forceRefresh = false}) async => const [];
 }
 
 void main() {

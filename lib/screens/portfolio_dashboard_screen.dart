@@ -18,27 +18,50 @@ class _PortfolioDashboardScreenState extends State<PortfolioDashboardScreen> {
   final _service = PortfolioService();
 
   List<Holding> _holdings = [];
-  bool _loading = true;
+  bool _loading = false;
   DateTime? _lastUpdated;
 
   @override
   void initState() {
     super.initState();
-    _loadPortfolio();
+    
+    // Initial sync from cache if available
+    if (_service.cachedHoldings != null) {
+      _holdings = _service.cachedHoldings!;
+      _lastUpdated = _service.lastUpdateTime;
+      _loading = false;
+    } else {
+      _loading = true;
+      _loadPortfolio(forceRefresh: false);
+    }
   }
 
-  Future<void> _loadPortfolio() async {
+  Future<void> _loadPortfolio({bool forceRefresh = false}) async {
+    if (!mounted) return;
+    
     setState(() {
       _loading = true;
     });
 
-    final holdings = await _service.getHoldings();
+    try {
+      final holdings = await _service.getHoldings(forceRefresh: forceRefresh);
 
-    setState(() {
-      _holdings = holdings;
-      _loading = false;
-      _lastUpdated = DateTime.now();
-    });
+      if (!mounted) return;
+      setState(() {
+        _holdings = holdings;
+        _loading = false;
+        _lastUpdated = _service.lastUpdateTime;
+      });
+    } catch (e) {
+      if (mounted) {
+        setState(() {
+          _loading = false;
+        });
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('Portföy güncellenemedi: $e')),
+        );
+      }
+    }
   }
 
   @override
@@ -48,7 +71,16 @@ class _PortfolioDashboardScreenState extends State<PortfolioDashboardScreen> {
     }
 
     if (_holdings.isEmpty) {
-      return const Center(child: Text('Henüz portföy oluşmadı'));
+      return RefreshIndicator(
+        onRefresh: () => _loadPortfolio(forceRefresh: true),
+        child: ListView(
+          physics: const AlwaysScrollableScrollPhysics(),
+          children: const [
+            SizedBox(height: 100),
+            Center(child: Text('Henüz portföy oluşmadı')),
+          ],
+        ),
+      );
     }
 
     final totalCost = _holdings.fold(0.0, (sum, item) => sum + item.costValue);
@@ -67,202 +99,206 @@ class _PortfolioDashboardScreenState extends State<PortfolioDashboardScreen> {
         ? 0.0
         : (totalProfitLoss / totalCost) * 100;
 
-    return ListView(
-      padding: const EdgeInsets.all(16),
-      children: [
-        Card(
-          margin: const EdgeInsets.only(bottom: 16),
-          child: Padding(
-            padding: const EdgeInsets.all(20),
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Row(
-                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                  children: [
-                    const Text(
-                      'Toplam Portföy',
-                      style: TextStyle(fontSize: 14, color: Colors.grey),
+    return RefreshIndicator(
+      onRefresh: () => _loadPortfolio(forceRefresh: true),
+      child: ListView(
+        padding: const EdgeInsets.all(16),
+        physics: const AlwaysScrollableScrollPhysics(),
+        children: [
+          Card(
+            margin: const EdgeInsets.only(bottom: 16),
+            child: Padding(
+              padding: const EdgeInsets.all(20),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Row(
+                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                    children: [
+                      const Text(
+                        'Toplam Portföy',
+                        style: TextStyle(fontSize: 14, color: Colors.grey),
+                      ),
+
+                      IconButton(
+                        icon: const Icon(Icons.refresh),
+                        tooltip: 'Yenile',
+                        onPressed: () => _loadPortfolio(forceRefresh: true),
+                      ),
+                    ],
+                  ),
+
+                  const SizedBox(height: 8),
+
+                  Text(
+                    AppFormatters.currencyValue(totalCurrent),
+                    style: const TextStyle(
+                      fontSize: 32,
+                      fontWeight: FontWeight.bold,
                     ),
+                  ),
 
-                    IconButton(
-                      icon: const Icon(Icons.refresh),
-                      tooltip: 'Yenile',
-                      onPressed: _loadPortfolio,
+                  const SizedBox(height: 10),
+
+                  Text(
+                    'Maliyet: ${AppFormatters.currencyValue(totalCost)}',
+                    style: TextStyle(
+                      color: Colors.grey[400],
+                      fontSize: 14,
+                      fontWeight: FontWeight.w600,
                     ),
-                  ],
-                ),
-
-                const SizedBox(height: 8),
-
-                Text(
-                  AppFormatters.currencyValue(totalCurrent),
-                  style: const TextStyle(
-                    fontSize: 32,
-                    fontWeight: FontWeight.bold,
                   ),
-                ),
+                  const SizedBox(height: 6),
 
-                const SizedBox(height: 10),
-
-                Text(
-                  'Maliyet: ${AppFormatters.currencyValue(totalCost)}',
-                  style: TextStyle(
-                    color: Colors.grey[400],
-                    fontSize: 14,
-                    fontWeight: FontWeight.w600,
+                  Text(
+                    'K/Z: ${AppFormatters.signedCurrencyValue(totalProfitLoss)} '
+                    '(${AppFormatters.percentValue(totalProfitLossPercent)})',
+                    style: TextStyle(
+                      color: totalProfitLoss >= 0 ? Colors.green : Colors.red,
+                      fontSize: 18,
+                      fontWeight: FontWeight.bold,
+                    ),
                   ),
-                ),
-                const SizedBox(height: 6),
+                  const SizedBox(height: 8),
 
-                Text(
-                  'K/Z: ${AppFormatters.signedCurrencyValue(totalProfitLoss)} '
-                  '(${AppFormatters.percentValue(totalProfitLossPercent)})',
-                  style: TextStyle(
-                    color: totalProfitLoss >= 0 ? Colors.green : Colors.red,
-                    fontSize: 18,
-                    fontWeight: FontWeight.bold,
-                  ),
-                ),
-                const SizedBox(height: 8),
-
-                Text(
-                  _lastUpdated == null
-                      ? ''
-                      : 'Son güncelleme: '
+                  Text(
+                    _lastUpdated == null
+                        ? ''
+                        : 'Son güncelleme: '
                             '${_lastUpdated!.hour.toString().padLeft(2, '0')}:'
                             '${_lastUpdated!.minute.toString().padLeft(2, '0')}',
-                  style: const TextStyle(color: Colors.grey, fontSize: 12),
-                ),
-              ],
+                    style: const TextStyle(color: Colors.grey, fontSize: 12),
+                  ),
+                ],
+              ),
             ),
           ),
-        ),
 
-        ..._holdings.map((holding) {
-          final profitColor = holding.profitLoss >= 0 ? Colors.green : Colors.red;
+          ..._holdings.map((holding) {
+            final profitColor = holding.profitLoss >= 0 ? Colors.green : Colors.red;
 
-          return Card(
-            margin: const EdgeInsets.only(bottom: 12),
-            child: InkWell(
-              onTap: widget.onFundSelected != null
-                  ? () => widget.onFundSelected!(holding.fundCode)
-                  : null,
-              borderRadius: BorderRadius.circular(12),
-              child: Padding(
-                padding: const EdgeInsets.all(16),
-                child: Row(
-                  crossAxisAlignment: CrossAxisAlignment.center,
-                  children: [
-                    Expanded(
-                      flex: 2,
-                      child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        mainAxisSize: MainAxisSize.min,
-                        children: [
-                          Text(
-                            holding.fundCode,
-                            style: const TextStyle(
-                              fontSize: 18,
-                              fontWeight: FontWeight.w700,
-                            ),
-                          ),
-                          const SizedBox(height: 8),
-                          Column(
-                            crossAxisAlignment: CrossAxisAlignment.start,
-                            children: [
-                              const Text(
-                                'Pay',
-                                style: TextStyle(
-                                  color: Colors.amber,
-                                  fontWeight: FontWeight.w700,
-                                  fontSize: 12,
-                                ),
+            return Card(
+              margin: const EdgeInsets.only(bottom: 12),
+              child: InkWell(
+                onTap: widget.onFundSelected != null
+                    ? () => widget.onFundSelected!(holding.fundCode)
+                    : null,
+                borderRadius: BorderRadius.circular(12),
+                child: Padding(
+                  padding: const EdgeInsets.all(16),
+                  child: Row(
+                    crossAxisAlignment: CrossAxisAlignment.center,
+                    children: [
+                      Expanded(
+                        flex: 2,
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          mainAxisSize: MainAxisSize.min,
+                          children: [
+                            Text(
+                              holding.fundCode,
+                              style: const TextStyle(
+                                fontSize: 18,
+                                fontWeight: FontWeight.w700,
                               ),
-                              Text(
-                                AppFormatters.percentValue(holding.portfolioSharePercent),
-                                style: const TextStyle(
-                                  color: Colors.amber,
-                                  fontWeight: FontWeight.w700,
-                                  fontSize: 12,
+                            ),
+                            const SizedBox(height: 8),
+                            Column(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: [
+                                const Text(
+                                  'Pay',
+                                  style: TextStyle(
+                                    color: Colors.amber,
+                                    fontWeight: FontWeight.w700,
+                                    fontSize: 12,
+                                  ),
                                 ),
-                              ),
-                            ],
-                          ),
-                        ],
-                      ),
-                    ),
-                    Expanded(
-                      flex: 4,
-                      child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        mainAxisSize: MainAxisSize.min,
-                        children: [
-                          Text(
-                            'Mal_Fiyatı: ${AppFormatters.currencyValue(holding.averageCost)}',
-                            style: const TextStyle(fontSize: 12),
-                          ),
-                          const SizedBox(height: 6),
-                          Text(
-                            'Adet: ${AppFormatters.quantityLabel(holding.quantity)}',
-                            style: const TextStyle(fontSize: 12),
-                          ),
-                          const SizedBox(height: 6),
-                          Text(
-                            'Toplam: ${AppFormatters.currencyValue(holding.costValue)}',
-                            style: const TextStyle(
-                              color: Colors.orange,
-                              fontSize: 12,
+                                Text(
+                                  AppFormatters.percentValue(holding.portfolioSharePercent),
+                                  style: const TextStyle(
+                                    color: Colors.amber,
+                                    fontWeight: FontWeight.w700,
+                                    fontSize: 12,
+                                  ),
+                                ),
+                              ],
                             ),
-                          ),
-                        ],
+                          ],
+                        ),
                       ),
-                    ),
-                    Expanded(
-                      flex: 4,
-                      child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        mainAxisSize: MainAxisSize.min,
-                        children: [
-                          Text(
-                            'Gün_Fiyatı: ${AppFormatters.currencyValue(holding.currentPrice)}',
-                            style: const TextStyle(
-                              color: Colors.cyan,
-                              fontSize: 12,
+                      Expanded(
+                        flex: 4,
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          mainAxisSize: MainAxisSize.min,
+                          children: [
+                            Text(
+                              'Mal_Fiyatı: ${AppFormatters.currencyValue(holding.averageCost)}',
+                              style: const TextStyle(fontSize: 12),
                             ),
-                          ),
-                          const SizedBox(height: 6),
-                          FittedBox(
-                            fit: BoxFit.scaleDown,
-                            alignment: Alignment.centerLeft,
-                            child: Text(
-                              'K/Z: ${AppFormatters.signedCurrencyValue(holding.profitLoss)} '
-                              '(${AppFormatters.percentValue(holding.profitLossPercent)})',
-                              style: TextStyle(
-                                color: profitColor,
-                                fontWeight: FontWeight.w600,
+                            const SizedBox(height: 6),
+                            Text(
+                              'Adet: ${AppFormatters.quantityLabel(holding.quantity)}',
+                              style: const TextStyle(fontSize: 12),
+                            ),
+                            const SizedBox(height: 6),
+                            Text(
+                              'Toplam: ${AppFormatters.currencyValue(holding.costValue)}',
+                              style: const TextStyle(
+                                color: Colors.orange,
                                 fontSize: 12,
                               ),
                             ),
-                          ),
-                          const SizedBox(height: 6),
-                          Text(
-                            'Toplam: ${AppFormatters.currencyValue(holding.currentValue)}',
-                            style: const TextStyle(
-                              color: Colors.cyan,
-                              fontSize: 12,
-                            ),
-                          ),
-                        ],
+                          ],
+                        ),
                       ),
-                    ),
-                  ],
+                      Expanded(
+                        flex: 4,
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          mainAxisSize: MainAxisSize.min,
+                          children: [
+                            Text(
+                              'Gün_Fiyatı: ${AppFormatters.currencyValue(holding.currentPrice)}',
+                              style: const TextStyle(
+                                color: Colors.cyan,
+                                fontSize: 12,
+                              ),
+                            ),
+                            const SizedBox(height: 6),
+                            FittedBox(
+                              fit: BoxFit.scaleDown,
+                              alignment: Alignment.centerLeft,
+                              child: Text(
+                                'K/Z: ${AppFormatters.signedCurrencyValue(holding.profitLoss)} '
+                                '(${AppFormatters.percentValue(holding.profitLossPercent)})',
+                                style: TextStyle(
+                                  color: profitColor,
+                                  fontWeight: FontWeight.w600,
+                                  fontSize: 12,
+                                ),
+                              ),
+                            ),
+                            const SizedBox(height: 6),
+                            Text(
+                              'Toplam: ${AppFormatters.currencyValue(holding.currentValue)}',
+                              style: const TextStyle(
+                                color: Colors.cyan,
+                                fontSize: 12,
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+                    ],
+                  ),
                 ),
               ),
-            ),
-          );
-        }),
-      ],
+            );
+          }),
+        ],
+      ),
     );
   }
 }

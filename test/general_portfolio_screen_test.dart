@@ -11,7 +11,7 @@ import 'package:fontakip/services/stock_portfolio_service.dart';
 
 class _FakePortfolioService extends PortfolioService {
   @override
-  Future<List<Holding>> getHoldings() async {
+  Future<List<Holding>> getHoldings({bool forceRefresh = false}) async {
     return const [
       Holding(
         fundCode: 'KLU',
@@ -30,7 +30,7 @@ class _FakePortfolioService extends PortfolioService {
 
 class _FakeStockPortfolioService extends StockPortfolioService {
   @override
-  Future<List<StockHolding>> getHoldings() async {
+  Future<List<StockHolding>> getHoldings({bool forceRefresh = false}) async {
     return const [
       StockHolding(
         symbol: 'THYAO',

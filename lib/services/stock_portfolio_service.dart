@@ -8,7 +8,18 @@ class StockPortfolioService {
   final _repository = StockTransactionRepository();
   final _stockService = StockService();
 
-  Future<List<StockHolding>> getHoldings() async {
+  // Simple in-memory cache
+  static List<StockHolding>? _cachedHoldings;
+  static DateTime? _lastUpdateTime;
+
+  List<StockHolding>? get cachedHoldings => _cachedHoldings;
+  DateTime? get lastUpdateTime => _lastUpdateTime;
+
+  Future<List<StockHolding>> getHoldings({bool forceRefresh = false}) async {
+    if (!forceRefresh && _cachedHoldings != null) {
+      return _cachedHoldings!;
+    }
+
     final transactions = await _repository.getAll();
 
     final Map<String, List<StockTransaction>> grouped = {};
@@ -77,6 +88,15 @@ class StockPortfolioService {
     }
 
     holdings.sort((a, b) => b.costValue.compareTo(a.costValue));
+    
+    _cachedHoldings = holdings;
+    _lastUpdateTime = DateTime.now();
+    
     return holdings;
+  }
+
+  void clearCache() {
+    _cachedHoldings = null;
+    _lastUpdateTime = null;
   }
 }

@@ -8,7 +8,18 @@ class PortfolioService {
   final _repository = TransactionRepository();
   final _fonoloji = FonolojiService();
 
-  Future<List<Holding>> getHoldings() async {
+  // Simple in-memory cache
+  static List<Holding>? _cachedHoldings;
+  static DateTime? _lastUpdateTime;
+
+  List<Holding>? get cachedHoldings => _cachedHoldings;
+  DateTime? get lastUpdateTime => _lastUpdateTime;
+
+  Future<List<Holding>> getHoldings({bool forceRefresh = false}) async {
+    if (!forceRefresh && _cachedHoldings != null) {
+      return _cachedHoldings!;
+    }
+
     final transactions = await _repository.getAll();
 
     final Map<String, List<Transaction>> grouped = {};
@@ -90,7 +101,7 @@ class PortfolioService {
       (sum, item) => sum + item.currentValue,
     );
 
-    return tempHoldings.map((holding) {
+    final results = tempHoldings.map((holding) {
       final sharePercent = totalPortfolioValue == 0
           ? 0.0
           : (holding.currentValue / totalPortfolioValue) * 100;
@@ -111,5 +122,15 @@ class PortfolioService {
         dailyChangeValue: holding.dailyChangeValue,
       );
     }).toList();
+
+    _cachedHoldings = results;
+    _lastUpdateTime = DateTime.now();
+
+    return results;
+  }
+
+  void clearCache() {
+    _cachedHoldings = null;
+    _lastUpdateTime = null;
   }
 }
